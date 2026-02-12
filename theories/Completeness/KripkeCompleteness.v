@@ -51,9 +51,11 @@ Section KripkeCompleteness.
       (rho ⊩⊥(A, K_ctx ) phi-> A ⊢S phi[rho]) /\
       ((forall B psi, A <<= B -> B ;; phi[rho] ⊢s psi -> B ⊢S psi) -> rho ⊩⊥(A, K_ctx) phi).
     Proof.
-      revert A rho; enough ((forall A rho, rho ⊩⊥( A, K_ctx) phi -> A ⊢S phi[rho]) /\
+      revert A rho.
+       enough ((forall A rho, rho ⊩⊥( A, K_ctx) phi -> A ⊢S phi[rho]) /\
                           (forall A rho, (forall B psi, A <<= B -> B;; phi[rho] ⊢s psi -> B ⊢S psi)
                                   -> rho ⊩⊥( A, K_ctx) phi)) by intuition.
+      (*                         
       induction phi as [|t1 t2|ff [] phi IHphi psi IHpsi|ff [] phi IHphi]; cbn; split; intros A rho.
       - tauto.
       - eauto.
@@ -71,6 +73,31 @@ Section KripkeCompleteness.
         + unfold phi'. asimpl. apply IHphi, Hsat.
       - intros H t. apply IHphi. intros B psi HB Hpsi. apply H. assumption.
         apply AllL with (t := t). now asimpl.
+      *)
+      induction phi as [|t1 t2|ff [] phi IHphi psi IHpsi|ff [] phi IHphi].
+      - cbn. split.
+        + intros A rho. 
+          tauto.
+        + intros A rho.
+          intros. eapply H.  reflexivity. apply Ax. (*AAAA non so bene cosa faccia qui*)
+      - cbn. split.
+        + intros A rho H. erewrite Vector.map_ext. 1 : exact H. apply universal_interp_eval.
+        + intros A rho H. erewrite Vector.map_ext. now apply H. apply universal_interp_eval.
+      - cbn. split.
+        + intros A rho H. apply IR. eapply IHpsi. eapply H. 1: auto. 
+        eapply IHphi. intros. simple eapply @Contr. exact H1. apply H0. simpl. left. reflexivity.
+        + intros A rho H B HB Hphi %IHphi. apply IHpsi. intros C xi HC Hxi. apply H. 
+          now transitivity B. apply IL. eapply seq_Weak. exact Hphi. apply HC. apply Hxi.
+      - cbn. split.
+        + intros A rho H. apply AllR.  (*AAAA non so esattamente cosa succede qui*)
+          pose (phi' := phi[up rho]).
+          destruct (find_bounded_L (phi' :: A)).
+          eapply seq_nameless_equiv_all' with (n := x) (phi := phi').
+          -- unfold bounded_L. intros xi Hxi. apply b. now right.
+          -- eapply bounded_up. apply b. now left. auto.
+          -- unfold phi'. asimpl. eapply IHphi. apply H.
+        + intros A rho H t. eapply IHphi. intros B psi HB Hpsi. 
+          apply H. apply HB. eapply AllL with (t:=t). asimpl. apply Hpsi. 
     Qed.
 
     Corollary K_ctx_sprv_exp {ff:falsity_flag} A rho phi :
@@ -80,8 +107,9 @@ Section KripkeCompleteness.
     Qed.
 
     Lemma K_ctx_subst_exp {ff:falsity_flag} A phi rho :
-      rho ⊩⊥( A, K_ctx) phi <-> var ⊩⊥( A, K_ctx) phi[rho].
+      rho ⊩⊥( A, K_ctx) phi <-> var ⊩⊥( A, K_ctx) phi[rho].  (*AAAA cos'è qui var? var is the identity substitution from numbers to terms*)
     Proof.
+    
       unfold ksat_bot, falsity_to_pred.
       rewrite <- atom_subst_comp. 2:easy.
       assert (forall {ff:falsity_flag} rho, (atom (Σ_preds := Σ_preds_bot) (inl tt) (Vector.nil _)) = (atom (Σ_preds := Σ_preds_bot) (inl tt) (Vector.nil _))[rho]) as Heq by easy.
@@ -91,6 +119,7 @@ Section KripkeCompleteness.
       apply ksat_ext. intros x. unfold funcomp. induction (rho x); cbn; try easy.
       erewrite <- Vector.map_ext_in. 2: apply IH.
       now rewrite Vector.map_id.
+
     Qed.
 
     Lemma K_ctx_constraint_exp {ff:falsity_flag} A rho psi:
