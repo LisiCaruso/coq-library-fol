@@ -143,9 +143,16 @@ Section Kripke.
           * intros. eapply IHphi2. 2: eapply H. intros. rewrite <- Hext. reflexivity. 
             apply H0. eapply IHphi1. 2: eapply H1. intros. rewrite <- Hext. reflexivity.
       - destruct q.
-        + split. intros.
-          * eapply IHphi. 2: apply H. intros. 
-
+        + split; intros.
+          * eapply (IHphi _ (j .: rho) (j .: xi)). 2: apply H. intros. 
+            unfold scons. destruct x. reflexivity. apply Hext.
+          * eapply (IHphi _ (j .: rho) (j .: xi)). 2: apply H. intros. 
+            unfold scons. destruct x. reflexivity. apply Hext.
+        + split; intros; destruct H.
+          * exists x. eapply (IHphi _ (x .: rho) (x .: xi)). 2: apply H.  intros. 
+            unfold scons. destruct x0. reflexivity. apply Hext.
+          * exists x. eapply (IHphi _ (x .: rho) (x .: xi)). 2: apply H.  intros. 
+            unfold scons. destruct x0. reflexivity. apply Hext.
     Qed.
 
     Lemma ksat_comp {ff : falsity_flag} u rho xi phi :
@@ -154,9 +161,11 @@ Section Kripke.
       induction phi as [ | b P v | | ] in rho, xi, u |-*; comp.
       - tauto.
       - erewrite Vector.map_map. erewrite Vector.map_ext. 2: apply eval_comp. reflexivity.
-      - destruct b0. setoid_rewrite IHphi1. now setoid_rewrite IHphi2.
-      - destruct q. setoid_rewrite IHphi. split; intros H d; eapply ksat_ext. 2, 4: apply (H d).
-        all: intros []; cbn; trivial; unfold funcomp; now erewrite eval_comp.
+      - destruct b0; setoid_rewrite IHphi1; now setoid_rewrite IHphi2.
+      - destruct q; setoid_rewrite IHphi.
+        + split; intros H d; eapply ksat_ext. 2, 4: apply (H d).
+        all: intros []; cbn; trivial; unfold funcomp; now erewrite eval_comp. 
+        + split; intros [j H]; exists j.  
     Qed.
 
   End Substs.
