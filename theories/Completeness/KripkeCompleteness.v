@@ -3,7 +3,7 @@
 From FOL Require Import FullSyntax Theories Deduction.FullSequentFacts.
 From Undecidability.Synthetic Require Import Definitions DecidabilityFacts EnumerabilityFacts ListEnumerabilityFacts ReducibilityFacts.
 From Undecidability Require Import Shared.ListAutomation Shared.Dec.
-From Stdlib Require Import Vector List Lia.
+Require Import Vector List Lia.
 Import ListAutomationNotations ListAutomationHints ListAutomationInstances ListAutomationFacts.
 From FOL.Completeness Require Export TarskiCompleteness.
 From FOL.Utils Require Import MPFacts.
@@ -27,7 +27,11 @@ Section KripkeCompleteness.
   Qed.
 
 (**"AAAAAAAAAA"
-copied this from coq-library-undecidability/blob/coq-8.20/theories/FOL/Semantics/Kripke/FragmentCore.v
+1) From Stdlib Require Import Vector List Lia.
+THIS DOESN'T WORK
+
+2)
+I copied and modified this from coq-library-undecidability/blob/coq-8.20/theories/FOL/Semantics/Kripke/FragmentCore.v
 I am not sure at all this is the right point where to put this (Should be in another file???)*)  
 (*changed domain with term --->>IDKWHY*)
 (** ** Kripke Semantics *)
@@ -38,7 +42,7 @@ Require Export Undecidability.FOL.Syntax.Facts.
 From Undecidability Require Import Shared.ListAutomation.
 Import ListAutomationNotations.
 
-
+Require Import Sets.Ensembles.
 Local Set Implicit Arguments.
 Local Unset Strict Implicit.
 
@@ -51,10 +55,10 @@ Section Kripke.
   Context {Σ_funcs : funcs_signature}.
   Context {Σ_preds : preds_signature}.
 
+
   Section Model.
 
-    Variable domain : Type.
-
+    (*Variable domain : Type.      took this away to give variable models*)
     Class kmodel :=
       {
         nodes : Type ;
@@ -62,6 +66,11 @@ Section Kripke.
         reachable : nodes -> nodes -> Prop ;
         reach_refl u : reachable u u ;
         reach_tran u v w : reachable u v -> reachable v w -> reachable u w ;
+
+        kdomain : nodes -> Type; (*OR MAYBE SETS??? should i call this kdomain or domain?*)
+
+        kdomain_incl u v : reachable u v -> subset (kdomain u) (kdomain v); 
+
 
         k_interp : interp domain ;
         k_P : nodes -> forall P : preds, Vector.t domain (ar_preds P) -> Prop ;
@@ -109,7 +118,6 @@ Section Kripke.
   Hint Resolve reach_refl : core.
 
   Section Substs.
-
     Variable D : Type.
     Context {M : kmodel D}.
 
@@ -165,8 +173,11 @@ Section Kripke.
       - destruct q; setoid_rewrite IHphi.
         + split; intros H d; eapply ksat_ext. 2, 4: apply (H d).
         all: intros []; cbn; trivial; unfold funcomp; now erewrite eval_comp. 
-        + split; intros [j H]; exists j.  
-    Qed.
+        + split. intros [j H]; exists j. Print eval. Print interp.
+          Print interp. Print ".:". Print eval_ext.
+          * admit.
+          * admit.
+    Admitted.
 
   End Substs.
 
@@ -195,7 +206,10 @@ Arguments ksat {_ _ _ _ _} _ _ _, {_ _ _} _ {_} _ _ _.
 
 
 Section Bottom.
-
+    (* "interp_bot" is in _opam/lib/coq/user-contrib/Undecidability/FOL/Semantics/Tarski/FragmentFacts.v
+       BUT doesn't seem to appear anywhere in  the "full" files. I don't know where to put it so I put it here
+       (MAYBE IT WOULD BE BETTER IF I MODIFIED THE WHOLE UDECIDABILITY FOLDER? 
+       TO ADD THE THINGS I AM RIGHT NOW ADDING MANUALLY???? )*)
   Context {Σ_funcs : funcs_signature}.
   Context {Σ_preds : preds_signature}.
 
