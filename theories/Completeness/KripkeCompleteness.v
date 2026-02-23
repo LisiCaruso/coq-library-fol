@@ -3,7 +3,7 @@
 From FOL Require Import FullSyntax Theories Deduction.FullSequentFacts.
 From Undecidability.Synthetic Require Import Definitions DecidabilityFacts EnumerabilityFacts ListEnumerabilityFacts ReducibilityFacts.
 From Undecidability Require Import Shared.ListAutomation Shared.Dec.
-Require Import Vector List Lia.
+Require Import Vector List Lia Ensembles.
 Import ListAutomationNotations ListAutomationHints ListAutomationInstances ListAutomationFacts.
 From FOL.Completeness Require Export TarskiCompleteness.
 From FOL.Utils Require Import MPFacts.
@@ -55,41 +55,120 @@ Section Kripke.
   Context {Σ_funcs : funcs_signature}.
   Context {Σ_preds : preds_signature}.
 
-
   Section Model.
+    Variable U : Type. (*might be completely wrong but I changed domain to U from now 
+    this is because I am 90% sure that domain would make me confuse with the 
+    domain of the world*)
 
-    (*Variable domain : Type.      took this away to give variable models*)
-    Class kmodel :=
-      {
+    Class kframe :=
+      {  
+        (*U : Type; *) (* it is basically the universe set *)
+        (*HOW do I make it so that I don't need to specify U as the universe every time I use 
+        something from the library Ensembles?*)
         nodes : Type ;
+        world : nodes -> Ensemble U;
 
         reachable : nodes -> nodes -> Prop ;
         reach_refl u : reachable u u ;
         reach_tran u v w : reachable u v -> reachable v w -> reachable u w ;
 
-        kdomain : nodes -> Type; (*OR MAYBE SETS??? should i call this kdomain or domain?*)
+        monotone u v : reachable u v -> Included U (world u) (world v);
+      }.
+    Context {frm : kframe}. (*(fun x : nat => x = n) *)
+    
 
-        kdomain_incl u v : reachable u v -> subset (kdomain u) (kdomain v); 
+    Definition vec_in_dom_P := fun (u: nodes) (P : preds) (vv : (Vector.t _ (ar_preds P))) => 
+          Vector.Forall (In U (world u)) vv.
 
+    (* Which one of the definitions is to prefer?
+    
+    Definition vec_in_dom_P (u: nodes) (P : preds) (vv : (Vector.t _ (ar_preds P))) : Prop :=
+          Vector.Forall (In U (world u)) vv.
+    *)
+    
+    
+    Definition vec_in_dom_f (u: nodes) (f : syms) (vv : (Vector.t _ (ar_syms f))) : Prop := 
+          Vector.Forall (In U (world u)) vv.
+    Print Vector.Forall.
+    Print In.
 
-        k_interp : interp domain ;
-        k_P : nodes -> forall P : preds, Vector.t domain (ar_preds P) -> Prop ;
-        (* k_Bot : nodes -> Prop ; *)
+    Class kmodel := {
+        (* how I do polimorphism so that I don't need to duplicate vec_in_dom for both 
+        my_vec_in_dom: forall u: nodes, forall vv : (Vector.t _ _), 
+          Vector.Forall (In U (world u)) vv;
 
-        mon_P : forall u v, reachable u v -> forall P (t : Vector.t domain (ar_preds P)), k_P u t -> k_P v t;
+          this doesn't work.
+        *)
+        monotone_vec_P (u v: nodes) {P: preds} (vv : (Vector.t U (ar_preds P))): vec_in_dom_P u vv -> vec_in_dom_P v vv;
+        monotone_vec_f (u v: nodes) {f: syms} (vv : (Vector.t U (ar_syms f))): vec_in_dom_f u vv -> vec_in_dom_f v vv;
+
+        k_P u P (vv:Vector.t U (ar_preds P)): @vec_in_dom_P u P vv -> Prop ; 
+
+        mon_P (u v:nodes) (P: preds) (vv: (Vector.t U (ar_preds P))) (a : vec_in_dom_P u vv) (reach : reachable u v): 
+           @k_P u P vv a -> @k_P v P vv (@monotone_vec_P u v P vv a);
+        
+        k_f u f (vv:Vector.t U (ar_syms f)): @vec_in_dom_f u f vv -> U; 
+
+        (*k_f_wellDef u f vv (vv_in_dom : (@vec_in_dom_f u f vv)): (In U (world u)) (k_f vv_in_dom); *)
+
+        mon_f (u v:nodes) (f: syms) (vv: (Vector.t U (ar_syms f))) (a : vec_in_dom_f u vv) (reach : reachable u v): 
+           @k_f u f vv a = @k_f v f vv (@monotone_vec_f u v f vv a);
       }.
 
-    Variable M : kmodel.
+    Print interp.
+    (*
+          Record
+      interp (Σ_funcs0 : funcs_signature) (Σ_preds0 : preds_signature) (domain : Type)
+      : Type := B_I
+      { i_func : forall f : Σ_funcs0, vec domain (ar_syms f) -> domain;
+      i_atom : forall P : Σ_preds0, vec domain (ar_preds P) -> Prop }.
+    *)
+    (* Taken from Undecidability.FOL.Semantics.Tarski.FullCore.eval*)
+    Context {M : kmodel}.
 
-    Fixpoint ksat {ff : falsity_flag} u (rho : nat -> domain) (phi : form) : Prop :=
+    Definition k_f_wellDef (u : nodes) (f :syms) (vv : (Vector.t U (ar_syms f))) (vv_in_dom : (@vec_in_dom_f u f vv)): Prop :=
+       (In U (world u)) (k_f vv_in_dom).
+
+    Print Vector.Forall.
+    Print prod.
+
+    Definition temporary (u: node):= prod Prop U.
+    Definition proj_1 (t : temporary) := let (a, b):= t in a.
+    Definition proj_2 (t: temporary) := let (a, b):= t in b.
+
+    
+
+
+    Fixpoint temp_keval (u: nodes) (rho : nat -> U) (t : term): temporary :=
+      match t with
+      | var s => (var_in_dom u, rho s) 
+      | func f v => let vv := (Vector.map (temp_keval u rho) v) in
+                    let vv_prop := (Vector.map proj_1 vv) in
+                    let vv_val := (Vector.map proj_2 vv) in
+                            @k_f M u f (vv_val) (@vec_in_dom_f u f vv_val)
+      end.
+    (*
+        eval =
+          fun (Σ_funcs : funcs_signature) (Σ_preds : preds_signature) (domain : Type)
+          (I : interp domain) =>
+          fix eval (rho : env domain) (t : term) {struct t} : domain :=
+          match t with
+          | $ s => rho s
+          | func f v => i_func (Vector.map (eval rho) v)
+          end
+              : forall {Σ_funcs : funcs_signature} {Σ_preds : preds_signature} [domain : Type],
+          interp domain -> env domain -> term -> domain
+    *)
+
+    Fixpoint ksat {ff : falsity_flag} (u: nodes) (rho : nat -> U) (phi : form) : Prop :=
       match phi with
-      | atom P v => k_P u (Vector.map (@eval _ _ _ k_interp rho) v)
+      | atom P v => k_P u (Vector.map (@eval _ _ U k_P rho) v)
       | falsity => False
       | bin Impl phi psi => forall v, reachable u v -> ksat v rho phi -> ksat v rho psi
       | bin Conj phi psi => (ksat u rho phi) /\ (ksat u rho psi)
-      |  bin Disj phi psi => (ksat u rho phi) \/ (ksat u rho psi) 
-      | quant All phi => forall j : domain, ksat u (j .: rho) phi
-      | quant Ex phi => exists j: domain, ksat u (j .: rho) phi
+      | bin Disj phi psi => (ksat u rho phi) \/ (ksat u rho psi) 
+      | quant All phi => forall j : U, ksat u (j .: rho) phi (*per ogni j, j è nel mondo u -> ffdgdf*)
+      | quant Ex phi => exists j: U, ksat u (j .: rho) phi (*esiste j: j è nel monod u /\ fghdsfgd *)
       end.
 
     Lemma ksat_mon {ff : falsity_flag} (u : nodes) (rho : nat -> domain) (phi : form) :

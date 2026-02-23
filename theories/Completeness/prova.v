@@ -3,50 +3,20 @@
 From FOL Require Import FullSyntax Theories Deduction.FullSequentFacts.
 From Undecidability.Synthetic Require Import Definitions DecidabilityFacts EnumerabilityFacts ListEnumerabilityFacts ReducibilityFacts.
 From Undecidability Require Import Shared.ListAutomation Shared.Dec.
-Require Import Vector List Lia.
+Require Import Vector List Lia Ensembles.
 Import ListAutomationNotations ListAutomationHints ListAutomationInstances ListAutomationFacts.
 From FOL.Completeness Require Export TarskiCompleteness.
 From FOL.Utils Require Import MPFacts.
 Require Import Nat.
-
-Section Ensembles.
-
-  Variable U : Type.
-
-  Definition Ensemble := U -> Prop.
-  Inductive Empty_set : Ensemble :=.
-  Definition In (A:Ensemble) (x:U) : Prop := A x.
-
-  Definition Included (B C:Ensemble) : Prop := forall x:U, In B x -> In C x.
-
-  Inductive Singleton (x:U) : Ensemble :=
-    In_singleton : In (Singleton x) x.
-
-  Inductive Union (B C:Ensemble) : Ensemble :=
-    | Union_introl : forall x:U, In B x -> In (Union B C) x
-    | Union_intror : forall x:U, In C x -> In (Union B C) x.
-
-  Definition Add (B:Ensemble) (x:U) : Ensemble := Union B (Singleton x).
-  
-  Inductive Intersection (B C:Ensemble) : Ensemble :=
-    Intersection_intro :
-    forall x:U, In B x -> In C x -> In (Intersection B C) x.
-
-
   (*
   Print "∈".
   Print contains.
   Notation "x ∈ A" := (In x A) (at level 200). (*RANDOM NUMber 20!?!!?*)
-  Notation "_ ∈ _" is already defined at level 70 with arguments constr at next level, constr
-at next level while it is now required to be at level 200 with arguments constr
-at next level, constr at next level.
+  Notation "_ ∈ _" is already defined at level 70 with arguments constr at next level, constr at next level while it is now required to be at level 200 with arguments constr at next level, constr at next level.
   
-  *)
 
-  Inductive Full_set : Ensemble :=
-    Full_intro : forall x:U, In Full_set x.
-End Ensembles.
-(* Definition U : Type. *)
+
+
 Definition setA := Singleton 0.
 Definition setB := Singleton 1.
 Definition setC := Singleton 2.
@@ -93,15 +63,11 @@ Proof.
   unfold Included in *. auto.
 Qed.
 
-
-
 Definition my_vec_in_dom (u: node) (P : preds) (vv : (Vector.t _ (ar_preds P))) : Prop := 
 Vector.Forall (In (my_world u)) vv.
 
+  *)
 
-Section VariableDomainKripke.
-  Context {Σ_funcs : funcs_signature}.
-  Context {Σ_preds : preds_signature}.
 
 (*
 Class interp := B_I
@@ -111,14 +77,19 @@ Class interp := B_I
       }
 
 _*)
-Definition vec_in_dom''  (u: node) (P : preds) (vv : (Vector.t nat (ar_preds P))) : Prop := 
-      Vector.Forall (In (my_world u)) vv.
 
-      Print preds_signature.
-Print Vector.Forall.
-  Class kmodel_base :=
+Section VariableDomainKripke.
+  Context {Σ_funcs : funcs_signature}.
+  Context {Σ_preds : preds_signature}.
+
+Variable U : Type.
+
+(*
+  Class kframe :=
       {  
-        U : Type; (* it is basically the universe set *)
+        (*U : Type; *) (* it is basically the universe set *)
+        (*HOW do I make it so that I don't need to specify U as the universe every time I use 
+        something from the library Ensembles?*)
         nodes : Type ;
         world : nodes -> Ensemble U;
 
@@ -126,27 +97,54 @@ Print Vector.Forall.
         reach_refl u : reachable u u ;
         reach_tran u v w : reachable u v -> reachable v w -> reachable u w ;
 
-        my_vec_in_dom: forall u: nodes, forall P :preds, forall vv : (Vector.t U (ar_preds P)), 
-          Vector.Forall (In (world u)) vv;
-
-        vec_in_dom_P: forall u: nodes, forall P :preds, forall vv : (Vector.t U (ar_preds P)), Prop; 
-        vec_in_dom_f: forall u: nodes, forall f :syms, forall vv : (Vector.t U (ar_syms f)), Prop; 
-
-        monotone u v : reachable u v -> Included (world u) (world v);
-        monotone_vec_P (u v: nodes) {P: preds} (vv : (Vector.t U (ar_preds P))): vec_in_dom_P u vv -> vec_in_dom_P v vv;
-        monotone_vec_f (u v: nodes) {f: syms} (vv : (Vector.t U (ar_syms f))): vec_in_dom_f u vv -> vec_in_dom_f v vv;
-
-        k_P u P (vv:Vector.t U (ar_preds P)): @vec_in_dom_P u P vv -> Prop ; 
-
-        mon_P (u v:nodes) (P: preds) (vv: (Vector.t U (ar_preds P))) (a : vec_in_dom_P u vv) (reach : reachable u v): 
-           @k_P u P vv a -> @k_P v P vv (@monotone_vec_P u v P vv a);
-        
-        k_f u f (vv:Vector.t U (ar_syms f)): @vec_in_dom_f u f vv -> U; 
-        k_f_wellDef u f vv (vv_in_dom : (@vec_in_dom_f u f vv)): (In (world u)) (k_f vv_in_dom);
-
-        mon_f (u v:nodes) (f: syms) (vv: (Vector.t U (ar_syms f))) (a : vec_in_dom_f u vv) (reach : reachable u v): 
-           @k_f u f vv a = @k_f v f vv (@monotone_vec_f u v f vv a);
+        monotone u v : reachable u v -> Included U (world u) (world v);
       }.
+*)
+        Class kframe :=
+      {  
+        (*U : Type; *) (* it is basically the universe set *)
+        (*HOW do I make it so that I don't need to specify U as the universe every time I use 
+        something from the library Ensembles?*)
+        nodes : Type ;
+        world : nodes -> Ensemble U;
+
+        reachable : nodes -> nodes -> Prop ;
+        reach_refl u : reachable u u ;
+        reach_tran u v w : reachable u v -> reachable v w -> reachable u w ;
+
+        monotone u v : reachable u v -> Included U (world u) (world v);
+      }.
+  Context {frm : kframe}.
+
+  Definition in_dom (u : nodes) (n : nat) (vv: (Vector.t _ n)): Prop :=
+    Vector.Forall (In U (world u)) vv.
+
+  Class kmodel := {
+        monotone_vec (u v: nodes) (n : nat) (vv : (Vector.t U n)): @in_dom u n vv -> @in_dom v n vv;
+
+        k_P u P (vv:Vector.t U (ar_preds P)): @in_dom u (ar_preds P) vv -> Prop ; 
+
+        mon_P (u v:nodes) (P: preds) (vv: (Vector.t U (ar_preds P))) (a : @in_dom u (ar_preds P) vv) (reach : reachable u v): 
+           @k_P u P vv a -> @k_P v P vv (@monotone_vec u v (ar_preds P) vv a);
+        
+        k_f u f (vv:Vector.t U (ar_syms f)): @in_dom u (ar_syms f) vv -> U; 
+        k_f_wellDef u f vv (vv_in_dom : (@in_dom u (ar_syms f) vv)): (In U (world u)) (k_f vv_in_dom);
+
+        mon_f (u v:nodes) (f: syms) (vv: (Vector.t U (ar_syms f))) (a : @in_dom u (ar_syms f) vv) (reach : reachable u v): 
+           @k_f u f vv a = @k_f v f vv (@monotone_vec u v (ar_syms f) vv a);
+      }.
+
+    (*
+ Class kinterp (u: nodes):= B_I
+      {
+        i_func : forall f : syms, Vector.t (U) (ar_syms f) -> (Some Type);
+        i_atom : forall P : preds, Vector.t (world u) (ar_preds P) -> Some Prop;
+      }.
+
+    Context {kI : kinterp}.
+*)
+
+
     Locate preds_signature.
 
     Variable M : kmodel.
