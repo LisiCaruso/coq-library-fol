@@ -76,45 +76,31 @@ Section Kripke.
       }.
     Context {frm : kframe}. (*(fun x : nat => x = n) *)
     
+  Definition in_dom (u : nodes) (n : nat) (vv: (Vector.t _ n)): Prop :=
+    Vector.Forall (In U (world u)) vv.
 
-    Definition vec_in_dom_P := fun (u: nodes) (P : preds) (vv : (Vector.t _ (ar_preds P))) => 
-          Vector.Forall (In U (world u)) vv.
+   Class kmodel := {
+        monotone_vec (u v: nodes) (n : nat) (vv : (Vector.t U n)): @in_dom u n vv -> @in_dom v n vv;
 
-    (* Which one of the definitions is to prefer?
-    
-    Definition vec_in_dom_P (u: nodes) (P : preds) (vv : (Vector.t _ (ar_preds P))) : Prop :=
-          Vector.Forall (In U (world u)) vv.
-    *)
-    
-    
-    Definition vec_in_dom_f (u: nodes) (f : syms) (vv : (Vector.t _ (ar_syms f))) : Prop := 
-          Vector.Forall (In U (world u)) vv.
-    Print Vector.Forall.
-    Print In.
+        k_P u P (vv:Vector.t U (ar_preds P)): @in_dom u (ar_preds P) vv -> Prop ; 
+        k_P' (u:nodes) P (vv:Vector.t U (ar_preds P)): Prop ; 
 
-    Class kmodel := {
-        (* how I do polimorphism so that I don't need to duplicate vec_in_dom for both 
-        my_vec_in_dom: forall u: nodes, forall vv : (Vector.t _ _), 
-          Vector.Forall (In U (world u)) vv;
-
-          this doesn't work.
-        *)
-        monotone_vec_P (u v: nodes) {P: preds} (vv : (Vector.t U (ar_preds P))): vec_in_dom_P u vv -> vec_in_dom_P v vv;
-        monotone_vec_f (u v: nodes) {f: syms} (vv : (Vector.t U (ar_syms f))): vec_in_dom_f u vv -> vec_in_dom_f v vv;
-
-        k_P u P (vv:Vector.t U (ar_preds P)): @vec_in_dom_P u P vv -> Prop ; 
-
-        mon_P (u v:nodes) (P: preds) (vv: (Vector.t U (ar_preds P))) (a : vec_in_dom_P u vv) (reach : reachable u v): 
-           @k_P u P vv a -> @k_P v P vv (@monotone_vec_P u v P vv a);
+        mon_P (u v:nodes) (P: preds) (vv: (Vector.t U (ar_preds P))) (a : @in_dom u (ar_preds P) vv) (reach : reachable u v): 
+           @k_P u P vv a -> @k_P v P vv (@monotone_vec u v (ar_preds P) vv a);
         
-        k_f u f (vv:Vector.t U (ar_syms f)): @vec_in_dom_f u f vv -> U; 
+        k_f u f (vv:Vector.t U (ar_syms f)): @in_dom u (ar_syms f) vv -> U; 
+        k_f' (u:nodes) f (vv:Vector.t U (ar_syms f)): U; 
+        k_f_wellDef u f vv (vv_in_dom : (@in_dom u (ar_syms f) vv)): (In U (world u)) (k_f vv_in_dom);
 
-        (*k_f_wellDef u f vv (vv_in_dom : (@vec_in_dom_f u f vv)): (In U (world u)) (k_f vv_in_dom); *)
+        mon_f (u v:nodes) (f: syms) (vv: (Vector.t U (ar_syms f))) (a : @in_dom u (ar_syms f) vv) (reach : reachable u v): 
+           @k_f u f vv a = @k_f v f vv (@monotone_vec u v (ar_syms f) vv a);
 
-        mon_f (u v:nodes) (f: syms) (vv: (Vector.t U (ar_syms f))) (a : vec_in_dom_f u vv) (reach : reachable u v): 
-           @k_f u f vv a = @k_f v f vv (@monotone_vec_f u v f vv a);
+        k_interp : interp U; (*this doesn't have any checks... idk*)
+
+
       }.
 
+      
     Print interp.
     (*
           Record
@@ -123,31 +109,18 @@ Section Kripke.
       { i_func : forall f : Σ_funcs0, vec domain (ar_syms f) -> domain;
       i_atom : forall P : Σ_preds0, vec domain (ar_preds P) -> Prop }.
     *)
-    (* Taken from Undecidability.FOL.Semantics.Tarski.FullCore.eval*)
+    (* Taken from Undecidability.FOL.Semantics.Tarski.FullCore.eval
     Context {M : kmodel}.
-
-    Definition k_f_wellDef (u : nodes) (f :syms) (vv : (Vector.t U (ar_syms f))) (vv_in_dom : (@vec_in_dom_f u f vv)): Prop :=
-       (In U (world u)) (k_f vv_in_dom).
-
-    Print Vector.Forall.
-    Print prod.
-
-    Definition temporary (u: node):= prod Prop U.
-    Definition proj_1 (t : temporary) := let (a, b):= t in a.
-    Definition proj_2 (t: temporary) := let (a, b):= t in b.
-
-    
-
 
     Fixpoint temp_keval (u: nodes) (rho : nat -> U) (t : term): temporary :=
       match t with
       | var s => (var_in_dom u, rho s) 
-      | func f v => let vv := (Vector.map (temp_keval u rho) v) in
+      | func f v => let vv := (Vector.map (eval u rho) v) in
                     let vv_prop := (Vector.map proj_1 vv) in
                     let vv_val := (Vector.map proj_2 vv) in
                             @k_f M u f (vv_val) (@vec_in_dom_f u f vv_val)
       end.
-    (*
+
         eval =
           fun (Σ_funcs : funcs_signature) (Σ_preds : preds_signature) (domain : Type)
           (I : interp domain) =>
@@ -160,15 +133,19 @@ Section Kripke.
           interp domain -> env domain -> term -> domain
     *)
 
+    Variable M : kmodel.
+
+    (* IS IT A PROBLEM THAT I AM USCING K_INTERP (HENCE NOT PROPERLY CHECKING THE BELONGING IN EVERY STEP)?*)
+
     Fixpoint ksat {ff : falsity_flag} (u: nodes) (rho : nat -> U) (phi : form) : Prop :=
       match phi with
-      | atom P v => k_P u (Vector.map (@eval _ _ U k_P rho) v)
+      | atom P v => let vv := (Vector.map (@eval _ _ _ k_interp rho) v) in forall aa : in_dom u vv, @k_P M u P vv aa
       | falsity => False
       | bin Impl phi psi => forall v, reachable u v -> ksat v rho phi -> ksat v rho psi
       | bin Conj phi psi => (ksat u rho phi) /\ (ksat u rho psi)
       | bin Disj phi psi => (ksat u rho phi) \/ (ksat u rho psi) 
-      | quant All phi => forall j : U, ksat u (j .: rho) phi (*per ogni j, j è nel mondo u -> ffdgdf*)
-      | quant Ex phi => exists j: U, ksat u (j .: rho) phi (*esiste j: j è nel monod u /\ fghdsfgd *)
+      | quant All phi => forall j : U, (In U (world u)) j -> ksat u (j .: rho) phi 
+      | quant Ex phi => exists j: U, ksat u (j .: rho) phi /\ (In U (world u)) j 
       end.
 
     Lemma ksat_mon {ff : falsity_flag} (u : nodes) (rho : nat -> domain) (phi : form) :
