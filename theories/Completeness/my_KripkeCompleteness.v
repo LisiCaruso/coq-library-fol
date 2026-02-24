@@ -1,6 +1,6 @@
 (** ** Kripke Completeness **)
 
-From FOL Require Import FragmentSyntax Theories Deduction.FragmentSequentFacts.
+From FOL Require Import FullSyntax Theories Deduction.FullSequentFacts.
 From Undecidability.Synthetic Require Import Definitions DecidabilityFacts EnumerabilityFacts ListEnumerabilityFacts ReducibilityFacts.
 From Undecidability Require Import Shared.ListAutomation Shared.Dec.
 Require Import Vector List Lia Ensembles.
@@ -8,16 +8,82 @@ Import ListAutomationNotations ListAutomationHints ListAutomationInstances ListA
 From FOL.Completeness Require Export TarskiCompleteness.
 From FOL.Utils Require Import MPFacts.
 
+
+Arguments eval {_ _ _} _ _ _.
+Arguments i_atom {_ _ _} _ _.
+Arguments i_func {_ _ _} _ _.
+
 (* ** Universal Models *)
+Section VariableDomainKripke.
+  Context {Σ_funcs : funcs_signature}.
+  Context {Σ_preds : preds_signature}.
+  
+Variable domain : Type.
+  Class kframe :=
+      {  
+        (*U : Type; *) (* it is basically the universe set *)
+        nodes : Type ;
+        world : nodes -> domain -> Prop;
+
+        reachable : nodes -> nodes -> Prop ;
+        reach_refl u : reachable u u ;
+        reach_tran u v w : reachable u v -> reachable v w -> reachable u w ;
+
+        monotone u v : reachable u v ->  forall x:domain, world u x ->  world u x ;
+      }.
+  Context {frm : kframe}.
+
+  Definition in_dom (u : nodes) (n : nat) (vv: (Vector.t _ n)): Prop :=
+    Vector.Forall (world u) vv.
+
+  Class kmodel := {
+        I : nodes -> interp domain;
+        
+        mon_f (u v:nodes) (f: syms) (vv: (Vector.t domain (ar_syms f))) (reach : reachable u v) (a : in_dom u vv): 
+           i_func (I u) f vv = i_func (I v) f vv;
+
+        k_f_wellDef u f vv (vv_in_dom : (in_dom u vv)): world u (i_func (I u) f vv);
+
+        mon_P (u v:nodes) (P: preds) (vv: (Vector.t domain (ar_preds P))) (reach : reachable u v) (a : in_dom u vv) : 
+           i_atom (I u) P vv -> i_atom (I v) P vv;
+      }.
+
+        Variable M : kmodel.
+
+   Fixpoint ksat {ff : falsity_flag} (u: nodes) (rho : nat -> domain) (phi : form) : Prop :=
+      match phi with
+      | atom P v => i_atom (I u) P (Vector.map (eval (I u) rho) v) 
+      | falsity => False
+      | bin Impl phi psi => forall v, reachable u v -> ksat v rho phi -> ksat v rho psi
+      | bin Conj phi psi => (ksat u rho phi) /\ (ksat u rho psi)
+      | bin Disj phi psi => (ksat u rho phi) \/ (ksat u rho psi) 
+      | quant All phi => forall v, reachable u v -> forall j : domain, world v j -> ksat v (j .: rho) phi 
+      | quant Ex phi => exists j: domain, world u j  /\  ksat u (j .: rho) phi
+      end.
+
+Definition good (u : nodes) (rho : nat -> domain)  := 
+      (forall n : nat, world u (rho n)).
+
+Lemma good_eval (u : nodes) (rho : nat -> domain) (t : term):
+  good u rho -> world u (eval (I u) rho t). 
+  Proof.
+    intros. induction t.
+    * intros. apply H.
+    * simpl. apply k_f_wellDef. unfold in_dom.
+      rewrite Vector.Forall_map.
+      Search Vector.Forall. 
+
+    
+
+  Qed.
+
+End VariableDomainKripke.
 
 Section KripkeCompleteness.
-  Context {Σf : funcs_signature} {Σp : preds_signature}. (*
-  Variable eF : nat -> option Σf.
-  Context {HeF : enumerator__T eF Σf}.
-  Variable eP : nat -> option Σp.
-  Context {HeP : enumerator__T eP Σp}. *)
+  Variable U : Type.
+  Context {Σf : funcs_signature} {Σp : preds_signature}.
+  Context {frm : kframe U}.
 
-(*  Hint Constructors sprv. *)
   Instance model_bot : interp term :=
     {| i_func := func; i_atom := fun P v => False|}.
   Lemma universal_interp_eval rho t :
@@ -25,35 +91,233 @@ Section KripkeCompleteness.
   Proof.
     now induction t; cbn.
   Qed.
+
+#[local] Ltac comp := repeat (progress (cbn in *; autounfold in *)).
+
+Section Kripke.
   
+  Context {Σ_funcs : funcs_signature}.
+  Context {Σ_preds : preds_signature}.
+
+    Lemma ksat_mon {ff : falsity_flag} (u : nodes) (rho : nat -> U) (phi : form) :
+      forall v (H : reachable u v), ksat u rho phi -> ksat v rho phi.
+    Proof.
+      revert rho.
+      induction phi; intros rho v' H; cbn.
+      * auto.
+      * intros. specialize H0 with .
+       
+      try destruct b0; try destruct q; intuition; eauto using mon_P, reach_tran.
+      * apply monotone_vec .
+      destruct H0.
+      exists x.
+      now apply IHphi.
+    Qed.
+ 
+    Lemma ksat_iff {ff : falsity_flag} u rho phi :
+      ksat u rho phi <-> forall v (H : reachable u v), ksat v rho phi.
+    Proof.
+      split.
+      - intros H1 v H2. eapply ksat_mon; eauto.
+      - intros H. apply H. eapply reach_refl.
+    Qed.
+  End Model.
+
+  Notation "rho  '⊩(' u ')'  phi" := (ksat _ u rho phi) (at level 20).
+  Notation "rho '⊩(' u , M ')' phi" := (@ksat _ M _ u rho phi) (at level 20).
+  Arguments ksat {_ _ _} _ _ _, _ _ _ _ _ _.
+
+  Hint Resolve reach_refl : core.
+
+  Section Substs.
+    Variable D : Type.
+    Context {M : kmodel D}.
+
+    Lemma ksat_ext {ff : falsity_flag} u rho xi phi :
+      (forall x, rho x = xi x) -> rho ⊩(u,M) phi <-> xi ⊩(u,M) phi.
+    Proof.
+      induction phi as [ | b P v | | ] in rho, xi, u |-*; intros Hext; comp.
+      - tauto.
+      - erewrite Vector.map_ext. reflexivity. intros t. now apply eval_ext.
+      (* - destruct b0; split; intros H v Hv Hv'; now apply (IHphi2 v rho xi Hext), (H _ Hv), (IHphi1 v rho xi Hext).
+      - destruct q; split; intros H d; apply (IHphi _ (d .: rho) (d .: xi)). all: ((intros []; cbn; congruence) + auto).
+      *)
+      - destruct b0.
+        + split; intros. 
+          * split.
+          ** eapply IHphi1. intros. 2: apply H. rewrite <- Hext. reflexivity.
+          ** eapply IHphi2. intros. 2: apply H. rewrite <- Hext. reflexivity.
+          * split.
+          ** eapply IHphi1. intros. 2: apply H. rewrite <- Hext. reflexivity.
+          ** eapply IHphi2. intros. 2: apply H. rewrite <- Hext. reflexivity.  (*è orribilmente ripetitivo, come sisetmare!?!?!*)
+        + split.
+          * intros [Hphi1 | Hphi2].
+          ** left. eapply IHphi1.  2: apply Hphi1. intros. rewrite <- Hext. reflexivity.
+          ** right. eapply IHphi2.  2: apply Hphi2. intros. rewrite <- Hext. reflexivity.
+          * intros [Hxi1 | Hxi2].
+          ** left. eapply IHphi1.  2: apply Hxi1. intros. rewrite <- Hext. reflexivity.
+          ** right. eapply IHphi2.  2: apply Hxi2. intros. rewrite <- Hext. reflexivity.
+        + split. 
+          * intros. eapply IHphi2. 2: eapply H. intros. rewrite <- Hext. reflexivity. 
+            apply H0. eapply IHphi1. 2: eapply H1. intros. rewrite <- Hext. reflexivity.
+          * intros. eapply IHphi2. 2: eapply H. intros. rewrite <- Hext. reflexivity. 
+            apply H0. eapply IHphi1. 2: eapply H1. intros. rewrite <- Hext. reflexivity.
+      - destruct q.
+        + split; intros.
+          * eapply (IHphi _ (j .: rho) (j .: xi)). 2: apply H. intros. 
+            unfold scons. destruct x. reflexivity. apply Hext.
+          * eapply (IHphi _ (j .: rho) (j .: xi)). 2: apply H. intros. 
+            unfold scons. destruct x. reflexivity. apply Hext.
+        + split; intros; destruct H.
+          * exists x. eapply (IHphi _ (x .: rho) (x .: xi)). 2: apply H.  intros. 
+            unfold scons. destruct x0. reflexivity. apply Hext.
+          * exists x. eapply (IHphi _ (x .: rho) (x .: xi)). 2: apply H.  intros. 
+            unfold scons. destruct x0. reflexivity. apply Hext.
+    Qed.
+
+    Lemma ksat_comp {ff : falsity_flag} u rho xi phi :
+      rho ⊩(u,M) phi[xi] <-> (xi >> eval rho (I := @k_interp _ M)) ⊩(u,M) phi.
+    Proof.
+      induction phi as [ | b P v | | ] in rho, xi, u |-*; comp.
+      - tauto.
+      - erewrite Vector.map_map. erewrite Vector.map_ext. 2: apply eval_comp. reflexivity.
+      - destruct b0; setoid_rewrite IHphi1; now setoid_rewrite IHphi2.
+      - destruct q; setoid_rewrite IHphi.
+        + split; intros H d; eapply ksat_ext. 2, 4: apply (H d).
+        all: intros []; cbn; trivial; unfold funcomp; now erewrite eval_comp. 
+        + split. intros [j H]; exists j. Print eval. Print interp.
+          Print interp. Print ".:". Print eval_ext.
+          * admit.
+          * admit.
+    Admitted.
+
+  End Substs.
+
+
+  Context {ff : falsity_flag}.
+
+  Definition kvalid_theo (T : form -> Prop) phi :=
+    forall D (M : kmodel D) u rho, (forall psi, T psi -> ksat u rho psi) -> ksat u rho phi.
+
+  Definition kvalid_ctx A phi :=
+    forall D (M : kmodel D) u rho, (forall psi, psi el A -> ksat u rho psi) -> ksat u rho phi.
+
+  Definition kvalid phi :=
+    forall D (M : kmodel D) u rho, ksat u rho phi.
+
+  Definition ksatis phi :=
+    exists D (M : kmodel D) u rho, ksat u rho phi.
+
+
+End Kripke.
+
+Notation "rho  '⊩(' u ')'  phi" := (ksat u rho phi) (at level 20).
+Notation "rho '⊩(' u , M ')' phi" := (@ksat _ _ _ M _ u rho phi) (at level 20).
+
+Arguments ksat {_ _ _ _ _} _ _ _, {_ _ _} _ {_} _ _ _.
+
+
+Section Bottom.
+    (* "interp_bot" is in _opam/lib/coq/user-contrib/Undecidability/FOL/Semantics/Tarski/FragmentFacts.v
+       BUT doesn't seem to appear anywhere in  the "full" files. I don't know where to put it so I put it here
+       (MAYBE IT WOULD BE BETTER IF I MODIFIED THE WHOLE UDECIDABILITY FOLDER? 
+       TO ADD THE THINGS I AM RIGHT NOW ADDING MANUALLY???? )*)
+  Context {Σ_funcs : funcs_signature}.
+  Context {Σ_preds : preds_signature}.
+
+  Context {domain : Type}.
+  Context {M : kmodel domain}.
+  Program Definition kmodel_bot 
+    (F_P : @nodes _ _ _ M -> Prop)
+    (mon_F : forall u v, reachable u v -> F_P u -> F_P v)
+     : @kmodel Σ_funcs (@Σ_preds_bot Σ_preds) domain := {|
+    nodes := @nodes _ _ _ M ;
+    reachable := @reachable _ _ _ M ;
+    k_interp := interp_bot False (@k_interp _ _ _ M) ;
+    k_P := fun n P => match P with inl _ => fun _ => F_P n | inr P' => @k_P _ _ _ M n P' end
+  |}.
+  Next Obligation. apply reach_refl. Qed.
+  Next Obligation. now apply reach_tran with v. Qed.
+  Next Obligation. destruct P as [|P'].
+    + now apply mon_F with u.
+    + now apply mon_P with u.
+  Qed.
+
+  Definition ksat_bot 
+    {ff : falsity_flag} (F_P : @nodes _ _ _ M -> Prop)
+    (mon_F : forall u v, reachable u v -> F_P u -> F_P v)
+    u (rho : env domain) (phi : form) : Prop 
+    := @ksat _ Σ_preds_bot domain (kmodel_bot mon_F) falsity_off u rho (falsity_to_pred phi).
+  Arguments ksat_bot {_} _ _ _ _.
+
+  Lemma sat_bot_False {ff:falsity_flag} u rho phi
+    (e : forall u v, reachable u v -> False -> False)
+    : @ksat_bot ff (fun _ => False) e u rho phi <-> @ksat _ _ domain M ff u rho phi.
+  Proof.
+    induction phi in rho,u|-*.
+    - easy.
+    - easy.
+    - destruct b0. unfold sat_bot, falsity_to_pred in *. cbn.
+      split; intros H v Hreach H1 %IHphi1; apply IHphi2; now apply H, H1.
+    - destruct q. unfold sat_bot, falsity_to_pred in *. cbn.
+      split; intros H d; apply IHphi, H.
+  Qed.
+
+End Bottom.
+
+Arguments ksat_bot {_} {_} {_} {_} {_} _ _ _ _.
+
+Section BottomDef.
+
+  Context {Σ_funcs : funcs_signature}.
+  Context {Σ_preds : preds_signature}.
+
+  Context {ff : falsity_flag}.
+
+  Definition kexploding D (M : kmodel D) F_P mon_F := forall v rho phi, ksat_bot F_P mon_F v rho (⊥ → phi).
+  Arguments kexploding _ _ _ _ : clear implicits.
+  Definition kvalid_exploding_ctx A phi :=
+    forall D (M : kmodel D) F_P mon_F u rho, kexploding D M F_P mon_F -> (forall psi, psi el A -> ksat_bot F_P mon_F u rho psi) -> ksat_bot F_P mon_F u rho phi.
+
+  Definition kvalid_exploding phi :=
+    forall D (M : kmodel D) F_P mon_F u rho, kexploding D M F_P mon_F -> ksat_bot F_P mon_F u rho phi.
+
+  Definition ksatis_exploding phi :=
+    exists D (M : kmodel D) F_P mon_F u rho, kexploding D M F_P mon_F /\ ksat_bot F_P mon_F u rho phi.
+
+End BottomDef.
+
   Section Contexts.
 
-    Program Instance K_ctx {ff:falsity_flag} : kmodel term :=
+    Program Instance K_ctx {ff:falsity_flag} : kmodel :=
       {|
         nodes := list form ;
         reachable := @incl form ;
         k_interp := model_bot ;
-        k_P := fun A P v => sprv A None (atom P v) ;
+        k_P := fun A P v => fprv A (atom P v) ; (*took away a "NONE"*)
       |}.
     Next Obligation.
-      abstract (eauto using seq_Weak).
+      (* abstract (eauto using seq_Weak). *)
+      abstract (eauto using weaken).
     Qed.
 
-    Definition F_P {ff} : list (@form _ _ _ ff) -> Prop := match ff with falsity_on => fun n => sprv n None ⊥ | _ => fun _ => False end.
-    Lemma mon_F {ff:falsity_flag} (u v : @nodes _ _ _ K_ctx) : reachable u v -> F_P u -> F_P v.
+    Definition F_P {ff} : list (@form _ _ _ ff) -> Prop := match ff with falsity_on => fun n => fprv n ⊥ | _ => fun _ => False end.
+    Lemma mon_F {ff:falsity_flag} (u v : @nodes K_ctx) : reachable u v -> F_P u -> F_P v. (*BEFORE (u v : @nodes _  _ K_ctx)*)
     Proof.
-      cbn. unfold F_P. destruct ff; try easy. intros H H1. eapply seq_Weak; [ exact H1| exact H].
+      cbn. unfold F_P. destruct ff; try easy. intros H H1. eapply weaken; [ exact H1| exact H]. intros. eapply weaken. apply H0. apply H.
     Qed.
 
-    Notation "rho '⊩⊥(' u , M ')' phi" :=  (@ksat_bot _ _ _ M _ F_P mon_F u rho phi) (at level 20).
+    Notation "rho '⊩⊥(' u , M ')' phi" :=  (@    _ _ _ M _ F_P mon_F u rho phi) (at level 20).
 
     Lemma K_ctx_correct_exp {ff:falsity_flag} (A : list form) rho phi :
       (rho ⊩⊥(A, K_ctx ) phi-> A ⊢S phi[rho]) /\
       ((forall B psi, A <<= B -> B ;; phi[rho] ⊢s psi -> B ⊢S psi) -> rho ⊩⊥(A, K_ctx) phi).
     Proof.
-      revert A rho; enough ((forall A rho, rho ⊩⊥( A, K_ctx) phi -> A ⊢S phi[rho]) /\
+      revert A rho.
+       enough ((forall A rho, rho ⊩⊥( A, K_ctx) phi -> A ⊢S phi[rho]) /\
                           (forall A rho, (forall B psi, A <<= B -> B;; phi[rho] ⊢s psi -> B ⊢S psi)
                                   -> rho ⊩⊥( A, K_ctx) phi)) by intuition.
+      (*                         
       induction phi as [|t1 t2|ff [] phi IHphi psi IHpsi|ff [] phi IHphi]; cbn; split; intros A rho.
       - tauto.
       - eauto.
@@ -71,6 +335,31 @@ Section KripkeCompleteness.
         + unfold phi'. asimpl. apply IHphi, Hsat.
       - intros H t. apply IHphi. intros B psi HB Hpsi. apply H. assumption.
         apply AllL with (t := t). now asimpl.
+      *)
+      induction phi as [|t1 t2|ff [] phi IHphi psi IHpsi|ff [] phi IHphi].
+      - cbn. split.
+        + intros A rho. 
+          tauto.
+        + intros A rho.
+          intros. eapply H.  reflexivity. apply Ax. (*AAAA non so bene cosa faccia qui*)
+      - cbn. split.
+        + intros A rho H. erewrite Vector.map_ext. 1 : exact H. apply universal_interp_eval.
+        + intros A rho H. erewrite Vector.map_ext. now apply H. apply universal_interp_eval.
+      - cbn. split.
+        + intros A rho H. apply IR. eapply IHpsi. eapply H. 1: auto. 
+        eapply IHphi. intros. simple eapply @Contr. exact H1. apply H0. simpl. left. reflexivity.
+        + intros A rho H B HB Hphi %IHphi. apply IHpsi. intros C xi HC Hxi. apply H. 
+          now transitivity B. apply IL. eapply seq_Weak. exact Hphi. apply HC. apply Hxi.
+      - cbn. split.
+        + intros A rho H. apply AllR.  (*AAAA non so esattamente cosa succede qui*)
+          pose (phi' := phi[up rho]).
+          destruct (find_bounded_L (phi' :: A)).
+          eapply seq_nameless_equiv_all' with (n := x) (phi := phi').
+          -- unfold bounded_L. intros xi Hxi. apply b. now right.
+          -- eapply bounded_up. apply b. now left. auto.
+          -- unfold phi'. asimpl. eapply IHphi. apply H.
+        + intros A rho H t. eapply IHphi. intros B psi HB Hpsi. 
+          apply H. apply HB. eapply AllL with (t:=t). asimpl. apply Hpsi. 
     Qed.
 
     Corollary K_ctx_sprv_exp {ff:falsity_flag} A rho phi :
@@ -80,8 +369,9 @@ Section KripkeCompleteness.
     Qed.
 
     Lemma K_ctx_subst_exp {ff:falsity_flag} A phi rho :
-      rho ⊩⊥( A, K_ctx) phi <-> var ⊩⊥( A, K_ctx) phi[rho].
+      rho ⊩⊥( A, K_ctx) phi <-> var ⊩⊥( A, K_ctx) phi[rho].  (*AAAA cos'è qui var? var is the identity substitution from numbers to terms*)
     Proof.
+    
       unfold ksat_bot, falsity_to_pred.
       rewrite <- atom_subst_comp. 2:easy.
       assert (forall {ff:falsity_flag} rho, (atom (Σ_preds := Σ_preds_bot) (inl tt) (Vector.nil _)) = (atom (Σ_preds := Σ_preds_bot) (inl tt) (Vector.nil _))[rho]) as Heq by easy.
@@ -91,6 +381,7 @@ Section KripkeCompleteness.
       apply ksat_ext. intros x. unfold funcomp. induction (rho x); cbn; try easy.
       erewrite <- Vector.map_ext_in. 2: apply IH.
       now rewrite Vector.map_id.
+
     Qed.
 
     Lemma K_ctx_constraint_exp {ff:falsity_flag} A rho psi:
