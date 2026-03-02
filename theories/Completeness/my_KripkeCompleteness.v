@@ -7,21 +7,22 @@ Require Import Vector List Lia Ensembles.
 Import ListAutomationNotations ListAutomationHints ListAutomationInstances ListAutomationFacts.
 From FOL.Completeness Require Export TarskiCompleteness.
 From FOL.Utils Require Import MPFacts.
+Require Import Coq.Program.Equality.
 
-
-Arguments eval {_ _ _} _ _ _.
-Arguments i_atom {_ _ _} _ _.
-Arguments i_func {_ _ _} _ _.
+Require Import Undecidability.FOL.Semantics.Tarski.FullCore.
 
 (* ** Universal Models *)
 Section VariableDomainKripke.
   Context {Σ_funcs : funcs_signature}.
   Context {Σ_preds : preds_signature}.
   
-Variable domain : Type.
+  Arguments eval {_ _ _} _ _ _.
+  Arguments i_atom {_ _ _} _ _.
+  Arguments i_func {_ _ _} _ _.
+
+Context {domain : Type}.
   Class kframe :=
       {  
-        (*U : Type; *) (* it is basically the universe set *)
         nodes : Type ;
         world : nodes -> domain -> Prop;
 
@@ -29,12 +30,12 @@ Variable domain : Type.
         reach_refl u : reachable u u ;
         reach_tran u v w : reachable u v -> reachable v w -> reachable u w ;
 
-        monotone u v : reachable u v ->  forall x:domain, world u x ->  world u x ;
+        monotone u v : reachable u v ->  forall x:domain, world u x ->  world v x ;
       }.
   Context {frm : kframe}.
 
   Definition in_dom (u : nodes) (n : nat) (vv: (Vector.t _ n)): Prop :=
-    Vector.Forall (world u) vv.
+    forall x, Vector.In x vv -> (world u) x.
 
   Class kmodel := {
         I : nodes -> interp domain;
@@ -42,17 +43,19 @@ Variable domain : Type.
         mon_f (u v:nodes) (f: syms) (vv: (Vector.t domain (ar_syms f))) (reach : reachable u v) (a : in_dom u vv): 
            i_func (I u) f vv = i_func (I v) f vv;
 
-        k_f_wellDef u f vv (vv_in_dom : (in_dom u vv)): world u (i_func (I u) f vv);
+        k_f_wellDef u f vv (vv_in_dom : (in_dom u vv)): world u (i_func (I u) f vv) (*/\  in_dom u vv*);
 
-        mon_P (u v:nodes) (P: preds) (vv: (Vector.t domain (ar_preds P))) (reach : reachable u v) (a : in_dom u vv) : 
+        mon_P (u v:nodes) (P: preds) (vv: (Vector.t domain (ar_preds P))) (reach : reachable u v) (*(a : in_dom u vv)*): 
            i_atom (I u) P vv -> i_atom (I v) P vv;
+
+        k_P_wellDef u P vv: i_atom (I u) P vv -> in_dom u vv;
       }.
 
-        Variable M : kmodel.
+   Context {M : kmodel}.
 
    Fixpoint ksat {ff : falsity_flag} (u: nodes) (rho : nat -> domain) (phi : form) : Prop :=
       match phi with
-      | atom P v => i_atom (I u) P (Vector.map (eval (I u) rho) v) 
+      | atom P vv => i_atom (I u) P (Vector.map (eval (I u) rho) vv) 
       | falsity => False
       | bin Impl phi psi => forall v, reachable u v -> ksat v rho phi -> ksat v rho psi
       | bin Conj phi psi => (ksat u rho phi) /\ (ksat u rho psi)
@@ -69,20 +72,83 @@ Lemma good_eval (u : nodes) (rho : nat -> domain) (t : term):
   Proof.
     intros. induction t.
     * intros. apply H.
-    * simpl. apply k_f_wellDef. unfold in_dom.
-      rewrite Vector.Forall_map.
-      Search Vector.Forall. 
+    * simpl. apply k_f_wellDef. unfold in_dom. intro x. eapply IH.
+      rewrite Vector.Forall_map. 
+      rewrite VectorSpec.Forall_forall. 
+      apply IH.
+  Qed.
 
-    
+   Lemma good_mon (u v: nodes) (rho : nat -> domain) :
+      good u rho -> reachable u v -> good v rho.
+    Proof.
+      intros. 
+      unfold good in *.
+      intros n.
+      eapply monotone. apply H0. apply H.
+    Qed.
 
+  Lemma eval_mon_var (u v: nodes) (rho : nat -> domain) (x: nat):
+      eval (I u) rho $ x = eval (I v) rho $ x.
+    Proof.
+      simpl. reflexivity.
+    Qed.
+
+(*
+    Definition ForallT (f g : term -> domain) (n : nat) (vv : t term n) {struct v} : Prop :=
+            match vv with
+            | Vector.nil _ => unit
+            | Vector.cons _ x n0 v0 => ((f x = g x) * ForallT f g n0 v0)
+            end.
+
+*)
+    Lemma equal_func_vv (A B : Type) (f g: A -> B) (n : nat) (vv: (Vector.t A n)) :
+      ForallT (fun x => f x = g x) vv -> Vector.map f vv = Vector.map g vv.
+    Proof.
+    intros. 
+    induction vv; simpl.
+    * reflexivity.
+    *  simpl in X. rewrite IHvv.
+      + f_equal. apply X.
+      + apply X.
+    Qed.
+
+ Lemma eval_well_def (u : nodes) (rho : nat -> domain)(t: term):
+      @good u rho -> world u (eval (I u) rho t).
+
+    Proof.
+    intros. Admitted.
+
+ Lemma eval_mon_t (u v: nodes) (rho : nat -> domain)(t: term):
+      @good u rho -> reachable u v -> eval (I u) rho t = eval (I v) rho t.
+      Print term_ind.
+      intros. induction t (*using term_rect'*). 
+      * simpl. reflexivity.
+      * simpl. Search Vector.map. erewrite Vector.map_ext_in. 2: apply IH. apply mon_f. apply H0. 
+        unfold in_dom. erewrite Vector.Forall_map. 
+
+    Qed.
+
+  Lemma eval_mon (u v: nodes) (rho : nat -> domain):
+      @good u rho -> reachable u v -> forall t: term, eval (I u) rho t = eval (I v) rho t.
+  Proof.
+    intros.
+    now apply eval_mon_t.
+  Qed.
+
+  Lemma map_eval_vv (u v: nodes) (rho : nat -> domain) (n : nat)(vv: Vector.t term n):
+      @good u rho -> reachable u v -> Vector.map (eval (I u) rho) vv = Vector.map (eval (I v) rho) vv.
+  Proof.
+    intros.
+    Search Vector.map. eapply Vector.map_ext. now eapply eval_mon.
   Qed.
 
 End VariableDomainKripke.
 
 Section KripkeCompleteness.
-  Variable U : Type.
+  (*Context {domain : Type}.*)
   Context {Σf : funcs_signature} {Σp : preds_signature}.
-  Context {frm : kframe U}.
+
+  (*Context `{frm : kframe}.*) (*THE BACKTICK ASSURES ME IT'S AN INSTANCE OF THE CLASS*)
 
   Instance model_bot : interp term :=
     {| i_func := func; i_atom := fun P v => False|}.
@@ -92,23 +158,44 @@ Section KripkeCompleteness.
     now induction t; cbn.
   Qed.
 
+  Context `{M : kmodel}.
+  Check list form.
+  (* I DO NOT UNDERSTAND why this doesn't work. 
+  Program Instance K_frm {ff:falsity_flag} : kframe :=
+      {|
+        nodes := list form ;
+        reachable := @incl form ;
+        (*k_interp := model_bot ;
+        k_P := fun A P v => sprv A None (atom P v) ;*)
+      |}.
+  Program Instance K_ctx {ff:falsity_flag}: kmodel:=
+      {| 
+        nodes := list form ;
+        reachable := @incl form ;
+        (*k_interp := model_bot ;
+        k_P := fun A P v => sprv A None (atom P v) ;*)
+      |}.
+*)
 #[local] Ltac comp := repeat (progress (cbn in *; autounfold in *)).
 
-Section Kripke.
-  
-  Context {Σ_funcs : funcs_signature}.
-  Context {Σ_preds : preds_signature}.
+    
+    Arguments eval {_ _ _} _ _ _.
 
-    Lemma ksat_mon {ff : falsity_flag} (u : nodes) (rho : nat -> U) (phi : form) :
-      forall v (H : reachable u v), ksat u rho phi -> ksat v rho phi.
+    Lemma ksat_mon {ff : falsity_flag} (u : nodes) (rho : nat -> domain) (phi : form) : 
+      good u rho -> forall v (H : reachable u v), ksat u rho phi -> ksat v rho phi.
     Proof.
       revert rho.
-      induction phi; intros rho v' H; cbn.
-      * auto.
-      * intros. specialize H0 with .
-       
-      try destruct b0; try destruct q; intuition; eauto using mon_P, reach_tran.
-      * apply monotone_vec .
+      induction phi; intros rho gd v R H; cbn.
+      * apply H.
+      * unfold ksat in H. 
+        apply (mon_P R). erewrite <- map_eval_vv. apply H. apply gd. apply R.
+      * destruct b0
+        + destruct H. split. 
+          ++ eapply IHphi1. apply gd. apply R. apply 
+        
+        
+        
+        .
       destruct H0.
       exists x.
       now apply IHphi.
@@ -121,7 +208,7 @@ Section Kripke.
       - intros H1 v H2. eapply ksat_mon; eauto.
       - intros H. apply H. eapply reach_refl.
     Qed.
-  End Model.
+
 
   Notation "rho  '⊩(' u ')'  phi" := (ksat _ u rho phi) (at level 20).
   Notation "rho '⊩(' u , M ')' phi" := (@ksat _ M _ u rho phi) (at level 20).

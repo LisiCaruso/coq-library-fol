@@ -25,7 +25,7 @@ Section KripkeCompleteness.
   Proof.
     now induction t; cbn.
   Qed.
-  
+
   Section Contexts.
 
     Program Instance K_ctx {ff:falsity_flag} : kmodel term :=
