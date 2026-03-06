@@ -27,7 +27,6 @@ Section KripkeCompleteness.
   Qed.
 
   Section Contexts.
-
     Program Instance K_ctx {ff:falsity_flag} : kmodel term :=
       {|
         nodes := list form ;

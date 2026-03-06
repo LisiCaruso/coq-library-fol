@@ -152,7 +152,12 @@ Qed.
       * simpl. apply H.
     Qed.  
 
-
+    Lemma shift_ext (rho xi: nat -> domain)(j : domain): 
+      (forall x : nat, rho x = xi x) -> forall x: nat, (j .: rho) x = (j .: xi) x.
+    Proof.
+      intros. unfold scons. destruct x. reflexivity. apply H. 
+    Qed.
+    
     Lemma good_ext (u: nodes) (rho xi: nat -> domain):
       good u rho ->  (forall x, rho x = xi x) -> good u xi.
     Proof.
@@ -250,28 +255,34 @@ Section KripkeCompleteness.
         + split. 
           * intros. eapply IHphi2. eapply good_mon. apply (good_ext gdu Hext). apply H0. 2: eapply H. intros. rewrite <- Hext. reflexivity. 
             apply H0. eapply IHphi1. apply (good_mon gdu H0). 2: eapply H1. intros. rewrite <- Hext. reflexivity.
-          * intros. eapply IHphi2. 2: eapply H. intros. rewrite <- Hext. reflexivity. 
-            apply H0. eapply IHphi1. 2: eapply H1. intros. rewrite <- Hext. reflexivity.
+          * intros. eapply IHphi2. eapply good_mon. apply gdu. apply H0. 2: eapply H. intros. rewrite <- Hext. reflexivity. 
+            apply H0. eapply IHphi1. eapply good_ext. apply (good_mon gdu H0). apply Hext. 
+             2: eapply H1. intros. rewrite <- Hext. reflexivity.
       - destruct q.
         + split; intros.
-          * eapply (IHphi _ (j .: rho) (j .: xi)). 2: apply H. intros. 
-            unfold scons. destruct x. reflexivity. apply Hext.
-          * eapply (IHphi _ (j .: rho) (j .: xi)). 2: apply H. intros. 
-            unfold scons. destruct x. reflexivity. apply Hext.
+          * eapply (IHphi _ (j .: rho) (j .: xi)). 3: apply H. eapply good_shift. apply (good_mon gdu H0). 
+            apply H1. intros. 
+            eapply shift_ext. apply Hext. apply H0. apply H1.
+          * eapply (IHphi _ (j .: rho) (j .: xi)). 3: apply H. eapply good_shift. apply (good_mon gdu H0). 
+            apply H1. intros. 
+            eapply shift_ext. apply Hext. apply H0. apply H1.
         + split; intros; destruct H.
-          * exists x. eapply (IHphi _ (x .: rho) (x .: xi)). 2: apply H.  intros. 
-            unfold scons. destruct x0. reflexivity. apply Hext.
-          * exists x. eapply (IHphi _ (x .: rho) (x .: xi)). 2: apply H.  intros. 
-            unfold scons. destruct x0. reflexivity. apply Hext.
+          * exists x. split. apply H. eapply (IHphi u (x .: rho) (x .: xi) ).
+            eapply (good_shift gdu). apply H. 2: apply H.  eapply shift_ext. apply Hext.
+          * exists x. split. apply H. eapply (IHphi _ (x .: rho) (x .: xi)). 
+           eapply (good_shift gdu). apply H. 2: apply H.  eapply shift_ext. apply Hext.
     Qed.
 
-    Lemma ksat_comp u rho xi phi :
-      rho ⊩(u,M) phi[xi] <-> (xi >> eval rho (I := @k_interp _ M)) ⊩(u,M) phi.
+    About ">>".
+
+    Lemma ksat_comp (u: nodes) (rho: nat -> domain)(xi : nat -> term) (phi: form) :
+      rho ⊩(u,M) phi[xi] <-> (xi >> eval (I u) rho) ⊩(u,M) phi.
     Proof.
       induction phi as [ | b P v | | ] in rho, xi, u |-*; comp.
       - tauto.
       - erewrite Vector.map_map. erewrite Vector.map_ext. 2: apply eval_comp. reflexivity.
-      - destruct b0; setoid_rewrite IHphi1; now setoid_rewrite IHphi2.
+      - split. intros. destruct b0. 
+      setoid_rewrite IHphi1; now setoid_rewrite IHphi2.
       - destruct q; setoid_rewrite IHphi.
         + split; intros H d; eapply ksat_ext. 2, 4: apply (H d).
         all: intros []; cbn; trivial; unfold funcomp; now erewrite eval_comp. 
