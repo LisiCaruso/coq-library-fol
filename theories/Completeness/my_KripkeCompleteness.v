@@ -41,10 +41,8 @@ Section VariableDomainKripke.
   Lemma in_dom_mon (u v: nodes)(n : nat) (vv: (t _ n)) :
       reachable u v -> in_dom u vv -> in_dom v vv.
   Proof.
-    intros.
-    unfold in_dom in *.
-    intros x H1.
-    eapply monotone. apply H. apply H0. apply H1.
+    unfold in_dom.
+    eauto using monotone.
   Qed. 
 
   Class kmodel := {
@@ -81,7 +79,7 @@ Lemma good_eval (u : nodes) (rho : nat -> domain) (t : term):
   good u rho -> world u (eval (I u) rho t). 
   Proof.
     intros. induction t.
-    * intros. apply H.
+    * eauto.
     * cbn. 
       apply k_f_wellDef.  unfold in_dom.
       intros x [a [b <-]] % vector_in_map. now apply IH.
@@ -90,32 +88,22 @@ Qed.
    Lemma good_mon (u v: nodes) (rho : nat -> domain) :
       good u rho -> reachable u v -> good v rho.
     Proof.
-      intros. 
-      unfold good in *.
-      intros n.
-      eapply monotone. apply H0. apply H.
+      unfold good.
+      intros.
+      eauto using monotone.
     Qed.
 
-    (*
-    Lemma equal_func_vv (A B : Type) (f g: A -> B) (n : nat) (vv: (t A n)) :
-      ForallT (fun x => f x = g x) vv -> map f vv = map g vv.
-    Proof.
-    intros. 
-    induction vv; simpl.
-    * reflexivity.
-    *  simpl in X. rewrite IHvv.
-      + f_equal. apply X.
-      + apply X.
-    Qed.
-*)
  Lemma eval_mon_t (u v: nodes) (rho : nat -> domain)(t: term):
       @good u rho -> reachable u v -> eval (I u) rho t = eval (I v) rho t.
       Print term_ind.
       intros. induction t. 
       * simpl. reflexivity.
       * simpl.
-        erewrite map_ext_in. apply mon_f. apply H0. unfold in_dom.
-        intros x [a [b <-]] % vector_in_map. erewrite <- IH. now eapply good_eval.
+        erewrite map_ext_in.
+        apply mon_f. apply H0. unfold in_dom.
+        intros x [a [b <-]] % vector_in_map. 
+        erewrite <- IH. 
+        now eapply good_eval.
         apply b. apply IH.
   Qed.     
 
@@ -136,10 +124,12 @@ Qed.
   Lemma in_dom_mix (u v: nodes) (rho : nat -> domain) (n : nat)(vv: t term n):
       @good u rho -> reachable u v -> in_dom u (map (eval (I u) rho) vv) -> in_dom u (map (eval (I v) rho) vv).
   Proof.
-    intros. erewrite map_ext_in. erewrite <- map_eval_vv. apply H1.
+    intros. 
+    erewrite map_ext_in. 
+    erewrite <- map_eval_vv. apply H1.
     apply H. apply H0.  
-    intros. eapply eval_mon. eapply good_mon.
-     apply H. apply H0. apply reach_refl.
+    intros. 
+    eauto using eval_mon, good_mon, reach_refl. 
   Qed.
 
    Lemma good_shift (u: nodes)(rho : nat -> domain)(j : domain):
@@ -147,9 +137,7 @@ Qed.
     Proof.
       unfold good.
       intros H wj n.
-      induction n.
-      * simpl. apply wj.
-      * simpl. apply H.
+      induction n; simpl; auto.
     Qed.  
 
     Lemma shift_ext (rho xi: nat -> domain)(j : domain): 
@@ -193,36 +181,27 @@ Section KripkeCompleteness.
       revert rho. 
       induction phi; intros rho gd R H; cbn.
       * apply H.
-      * unfold ksat in H. 
+      * unfold ksat in H.
         apply (mon_P R). 
-          ++ erewrite map_eval_vv. 3: apply reach_refl. 
-              eapply in_dom_mix. apply gd. apply R.  
-              now eapply k_P_wellDef.
-              now eapply good_mon.
-          ++ erewrite <- map_eval_vv. apply H. apply gd. apply R.
+          ++ erewrite map_eval_vv; try apply reach_refl; eauto using in_dom_mix, k_P_wellDef, good_mon. 
+          ++ erewrite <- map_eval_vv; eauto. 
       * destruct b0.
-        + destruct H as (H1, H2). split.
-          ++ eapply IHphi1. apply gd. apply R. apply H1.
-          ++ eapply IHphi2. apply gd. apply R. apply H2.
-        + destruct H.
-          ++ left.  eapply IHphi1. apply gd. apply R. apply H. 
-          ++ right. eapply IHphi2. apply gd. apply R. apply H. 
-        + simpl in H. intros w Rw IH. eapply H. eapply reach_tran. apply R. apply Rw. apply IH. 
-      * destruct q.
-        + simpl in H. intros w Rw j wj. 
-          eapply H. eapply reach_tran. apply R. apply Rw. apply wj.
-        + simpl in H. destruct H as (j, H). exists j. split.
-          ++ eapply monotone. apply R. apply H.
+        + destruct H; split; eauto.
+        + destruct H; [left | right]; eauto. 
+        + simpl in H. intros w Rw IH. eauto using reach_tran. 
+      * destruct q; simpl in H.
+        + intros w Rw j wj. eauto using reach_tran. 
+        + destruct H as (j, H). exists j. split.
+          ++ eapply monotone; now eauto.
           ++ eapply IHphi. now eapply good_shift. apply R. apply H.
     Qed.
 
     Lemma ksat_iff {ff : falsity_flag}(u v: nodes) (rho : nat -> domain) (phi : form):
       good u rho -> (ksat u rho phi <-> forall v (H : reachable u v), ksat v rho phi).
     Proof.
-      intros.
-      split.
-      - intros. eapply ksat_mon; eauto.
-      - intros. apply H0. eapply reach_refl.
+      split; intros.
+      - eapply ksat_mon; eauto.
+      - auto using reach_refl.
     Qed.
 
   Notation "rho  '⊩(' u ')'  phi" := (ksat _ u rho phi) (at level 20).
@@ -239,33 +218,23 @@ Section KripkeCompleteness.
       induction phi as [ | b P v | | ] in rho, xi, u |-*; intros gdu Hext; comp.
       - tauto.
       - erewrite Vector.map_ext. reflexivity. intros t. now apply eval_ext.
-      (* - destruct b0; split; intros H v Hv Hv'; now apply (IHphi2 v rho xi Hext), (H _ Hv), (IHphi1 v rho xi Hext).
-      - destruct q; split; intros H d; apply (IHphi _ (d .: rho) (d .: xi)). all: ((intros []; cbn; congruence) + auto).
-      *)
       - destruct b0;  split; intros H; try intros v Huv; rewrite IHphi1, IHphi2; eauto using good_ext, good_mon.  
-        
       - destruct q.
         + split; intros; erewrite IHphi; eauto using good_mon, shift_ext, good_shift, good_ext.
-        + split; intros; destruct H.
-          * exists x. split. apply H. eapply (IHphi u (x .: rho) (x .: xi) ).
-            eapply (good_shift gdu). apply H. 2: apply H.  eapply shift_ext. apply Hext.
-          * exists x. split. apply H. eapply (IHphi _ (x .: rho) (x .: xi)). 
-           eapply (good_shift gdu). apply H. 2: apply H.  eapply shift_ext. apply Hext.
-    Qed.z
+        + split; intros; destruct H; exists x; split; try now eauto.
+          eapply (IHphi _ (x .: rho) (x .: xi)); try now eauto using shift_ext.
+          now eapply good_shift. 
+          eapply (IHphi _ (x .: xi) (x .: rho)); try now eauto using shift_ext. 
+          eapply good_shift; now eauto using good_ext. 
+    Qed.
 
   Lemma eval_shift_up (u: nodes)(rho: nat -> domain)(xi : nat -> term)(j : domain)(n: nat):
     ( j .: xi >> eval (I u) rho) n = ((up xi) >> eval (I u) (j .:rho)) n.
    Proof.
-     intros. induction n. 
-     * cbn. reflexivity.
-     * cbn. unfold ">>" in *. erewrite <- eval_up. reflexivity.
+     intros; induction n; cbn.
+     * reflexivity.
+     * unfold ">>" in *. now erewrite <- eval_up. 
    Qed.
-(*
-   Lemma eval_shift_up_S (u: nodes)(rho: nat -> domain)(xi : nat -> term)(j : domain)(n: nat):
-   eval (I u) (j .: rho) (up xi (S n)) = eval (I u) (rho) (xi n).
-   Proof.
-    induction n. Locate eval.
-*)   
     
     Lemma ksat_comp (*{ff : falsity_flag}*)(u: nodes)(rho: nat -> domain)(xi : nat -> term)(phi: form) :
       good u rho -> (rho ⊩(u,M) phi[xi] <-> (xi >> eval (I u) rho) ⊩(u,M) phi).
@@ -276,10 +245,12 @@ Section KripkeCompleteness.
       - split; intros; destruct b0; intros. 
         + split; [eapply IHphi1| eapply IHphi2]. apply H. apply H0. apply H. apply H0.
         + destruct H0; [left | right]; [eapply IHphi1| eapply IHphi2].  apply H. apply H0. apply H. apply H0.
-        + rewrite (@ksat_ext _ _ (xi >> eval (I u) rho)) in *. revert H2.
+
+
+        + (*rewrite (@ksat_ext _ _ (xi >> eval (I u) rho)) in *. revert H2.
           (*rewrite <- IHphi1, <- IHphi2.*) apply H0.
         
-        rewrite (@ksat_ext _ _ (xi >> eval (I u) rho)). rewrite ksat_ext at 2. rewrite <- IHphi1.
+        rewrite (@ksat_ext _ _ (xi >> eval (I u) rho)). rewrite ksat_ext at 2. rewrite <- IHphi1. *)
         
         
         
