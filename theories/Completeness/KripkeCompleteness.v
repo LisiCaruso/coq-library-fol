@@ -38,6 +38,8 @@ Section KripkeCompleteness.
       abstract (eauto using seq_Weak).
     Qed.
 
+    Locate sprv.
+
     Definition F_P {ff} : list (@form _ _ _ ff) -> Prop := match ff with falsity_on => fun n => sprv n None ⊥ | _ => fun _ => False end.
     Lemma mon_F {ff:falsity_flag} (u v : @nodes _ _ _ K_ctx) : reachable u v -> F_P u -> F_P v.
     Proof.

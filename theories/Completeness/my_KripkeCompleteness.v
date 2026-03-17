@@ -1,6 +1,7 @@
 (** ** Kripke Completeness **)
 
-From FOL Require Import FullSyntax Theories Deduction.FullSequentFacts.
+From FOL Require Import FullSyntax Theories Deduction.FullSequentFacts Deduction.FragmentSequentFacts.
+
 From Undecidability.Synthetic Require Import Definitions DecidabilityFacts EnumerabilityFacts ListEnumerabilityFacts ReducibilityFacts.
 From Undecidability Require Import Shared.ListAutomation Shared.Dec.
 Require Import List Vector Lia.
@@ -157,6 +158,13 @@ Qed.
     Proof.
     intros. unfold good. intros. eapply good_eval. apply H.
     Qed.
+
+    Lemma good_comp_reach (u v: nodes)(rho: nat -> domain)(xi : nat -> term):
+      good u rho -> reachable u v -> good v (xi >> eval (I u) rho).
+    Proof.
+    unfold good. intros. eapply good_mon; now eauto using good_comp. 
+    Qed.
+
       
     
 End VariableDomainKripke.
@@ -228,12 +236,21 @@ Section KripkeCompleteness.
           eapply good_shift; now eauto using good_ext. 
     Qed.
 
-  Lemma eval_shift_up (u: nodes)(rho: nat -> domain)(xi : nat -> term)(j : domain)(n: nat):
+   Lemma eval_shift_up (u: nodes)(rho: nat -> domain)(xi : nat -> term)(j : domain)(n: nat):
     ( j .: xi >> eval (I u) rho) n = ((up xi) >> eval (I u) (j .:rho)) n.
    Proof.
      intros; induction n; cbn.
      * reflexivity.
      * unfold ">>" in *. now erewrite <- eval_up. 
+   Qed.
+
+   Lemma eval_mon_shift_up (u v: nodes)(rho: nat -> domain)(xi : nat -> term)(j : domain)(n: nat):
+    good u rho -> reachable u v ->
+    ( j .: xi >> eval (I u) rho) n = ((up xi) >> eval (I v) (j .:rho)) n.
+   Proof.
+     intros; induction n; cbn.
+     * reflexivity.
+     * unfold ">>" in *. erewrite eval_mon; [now erewrite <- eval_up | | ]; auto.
    Qed.
     
     Lemma ksat_comp (*{ff : falsity_flag}*)(u: nodes)(rho: nat -> domain)(xi : nat -> term)(phi: form) :
@@ -242,95 +259,143 @@ Section KripkeCompleteness.
       induction phi as [ | b P v | | ] in rho, xi, u |-*; comp.
       - tauto.
       - erewrite Vector.map_map. erewrite Vector.map_ext. 2: apply eval_comp. reflexivity.
-      - split; intros; destruct b0; intros. 
-        + split; [eapply IHphi1| eapply IHphi2]. apply H. apply H0. apply H. apply H0.
-        + destruct H0; [left | right]; [eapply IHphi1| eapply IHphi2].  apply H. apply H0. apply H. apply H0.
-
-
-        + (*rewrite (@ksat_ext _ _ (xi >> eval (I u) rho)) in *. revert H2.
-          (*rewrite <- IHphi1, <- IHphi2.*) apply H0.
-        
-        rewrite (@ksat_ext _ _ (xi >> eval (I u) rho)). rewrite ksat_ext at 2. rewrite <- IHphi1. *)
-        
-        
-        
-        eapply ksat_ext. 3: eapply IHphi2.
-          unfold good. intros. eapply monotone. apply H1. apply (good_comp xi H). 
-          intros. (*set (H3 := (good_mon H H1)).*)
-          apply (eval_mon H H1).
-          apply (good_mon H H1).
-          apply (H0 v H1). apply IHphi1. (*now eapply good_mon.*)
-          apply (good_mon H H1). 
-          eapply ksat_ext. 
-          apply good_comp. apply (good_mon H H1). 
-          2: apply H2.
-          intros. unfold ">>". erewrite <- (eval_mon_t (xi x)). 2: apply H. 2: apply H1.
-          reflexivity.
-        + split; [eapply IHphi1| eapply IHphi2]. apply H. apply H0. apply H. apply H0.
-        + destruct H0; [left | right]; [eapply IHphi1| eapply IHphi2].  apply H. apply H0. apply H. apply H0.
-        + eapply IHphi2. eapply (good_mon H H1). eapply ksat_ext. 3: eapply H0.
-          eapply good_comp. eapply (good_mon H H1). 2: apply H1. 
-          intros. unfold ">>". erewrite <- (eval_mon_t (xi x)). 2: apply H. 2: apply H1.
-          reflexivity. 
-          eapply ksat_ext. 
-          unfold good. intros. eapply monotone. apply H1. apply good_comp. apply H.
-          2: eapply IHphi1. 3: apply H2.
-          intros. unfold ">>". now apply eval_mon. now eapply good_mon.
-      - split; intros; destruct q; intros.
-        + (*???????*)
-         eapply ksat_mon. 2: apply H1. 
-         2:eapply ksat_ext. 4: eapply IHphi. 5: eapply H0.
-          apply good_shift. eapply good_mon. apply good_comp. apply H. apply H1. apply H2.
-
-
-
-
-          (* 2: apply good_shift. 2: now eapply good_mon. 2: apply H2.
-
-          
-            intros n. apply  induction n. 
-              ** cbn.  reflexivity.
-              ** cbn. unfold ">>".  now erewrite eval_comp.
-              ** erewrite <- ksat_ext. 3: intros x. 3: rewrite <- H3. 3: reflexivity.
-                  2: eapply good_mon. 3: apply H1. 2: unfold good. 2: intro. 2: induction n. 
-        + destruct H0 as (j, H0). exists j. split.
-          apply H0. 
-          setoid_rewrite IHphi.
-
-
-
-        destruct q. setoid_rewrite IHphi. split; intros H d; eapply ksat_ext. 2, 4: apply (H d).
-        all: intros []; cbn; trivial; unfold funcomp; now erewrite eval_comp.*)
-
+      - destruct b0; intros.
+        + split; [split; [eapply IHphi1| eapply IHphi2] | split; [eapply IHphi1| eapply IHphi2]]; now eauto.
+        + split; intros; destruct H0; [left | right | left | right]; 
+          [eapply IHphi1| eapply IHphi2 | eapply IHphi1| eapply IHphi2]; now eauto. 
+        + split; intros.
+          ++ eapply ksat_ext; [now eapply good_comp_reach| intros | eapply IHphi2]; try now eauto using eval_mon, good_mon.
+            apply (H0 v H1). 
+            eapply IHphi1. apply (good_mon H H1).
+            eapply ksat_ext. 
+            apply good_comp. apply (good_mon H H1). 
+            2: apply H2. 
+            intros. unfold ">>". erewrite <- (eval_mon_t (xi x)); now eauto.
+          ++ eapply IHphi2; eauto using good_mon. eapply ksat_ext; [ | | eapply H0]; intros;
+            eauto using good_comp, good_mon.
+            unfold ">>". erewrite <- (eval_mon_t (xi x)); eauto. 
+            eapply ksat_ext. now eapply good_comp_reach. 
+            2: eapply IHphi1. 3: apply H2. intros. unfold ">>". now apply eval_mon. now eapply good_mon.
+      - destruct q.
+        + split; intros.
+          * eapply ksat_ext; try eapply IHphi; try eapply H0;
+            [unfold good; intros; eapply good_shift| intros |  |  | ]; 
+            eauto using good_comp_reach, good_shift, good_mon. now eapply eval_mon_shift_up. 
+          * eapply IHphi. 
+            apply good_shift; eauto using  good_mon.
+            eapply ksat_ext; [ | | eapply H0]; eauto using H2; [|intros; erewrite eval_mon_shift_up]; 
+            now eauto using good_comp, good_shift, good_mon.
+        + split; intros.
+          * destruct H0 as (j, (H0, H1)). exists j. split; try apply H0.
+            eapply ksat_ext; try eapply IHphi; try eapply H1; [ |intros; now eapply eval_mon_shift_up |];
+            now eauto using good_shift, good_comp.
+          * destruct H0 as (j, (H0, H1)). exists j. split; try apply IHphi; eauto using good_shift.
+            eapply ksat_ext; try eapply H1; [ |intros]; 
+            now eauto using eval_shift_up, good_shift, good_comp.
     Qed.
 
   End Substs.
 
 
   Context {ff : falsity_flag}.
+    Arguments ksat {_ _ _} _ {_} _, _ _ _ _ _ _.
 
   Definition kvalid_theo (T : form -> Prop) phi :=
-    forall D (M : kmodel D) u rho, (forall psi, T psi -> ksat u rho psi) -> ksat u rho phi.
+  forall (M: kmodel) (u: nodes) (rho: nat -> domain), 
+  (forall psi, T psi -> ksat M  u rho psi) -> ksat M  u rho phi.
 
   Definition kvalid_ctx A phi :=
-    forall D (M : kmodel D) u rho, (forall psi, psi el A -> ksat u rho psi) -> ksat u rho phi.
+    forall (M: kmodel) (u: nodes) (rho: nat -> domain),
+     (forall psi, psi el A -> ksat M u rho psi) -> ksat M u rho phi.
 
   Definition kvalid phi :=
-    forall D (M : kmodel D) u rho, ksat u rho phi.
+    forall (M: kmodel) (u: nodes) (rho: nat -> domain), 
+      ksat M u rho phi.
 
   Definition ksatis phi :=
-    exists D (M : kmodel D) u rho, ksat u rho phi.
+    exists (M: kmodel) (u: nodes) (rho: nat -> domain), ksat M u rho phi.
 
 
 Section Bottom.
-    (* "interp_bot" is in _opam/lib/coq/user-contrib/Undecidability/FOL/Semantics/Tarski/FragmentFacts.v
-       BUT doesn't seem to appear anywhere in  the "full" files. I don't know where to put it so I put it here
-       *)
+
   Context {Σ_funcs : funcs_signature}.
   Context {Σ_preds : preds_signature}.
 
-  Context {domain : Type}.
-  Context {M : kmodel domain}.
+  (*
+  Questo ` è subst_term. 
+    Fixpoint subst_term (σ : nat -> term) (t : term) : term :=
+    match t with
+    | var t => σ t
+    | func f v => func f (map (subst_term σ) v)
+    end.
+
+*)
+
+  Locate subst_term.
+
+    (*
+  Lemma universal_interp_eval (rho: nat -> domain) (u: nodes) (t: term) :
+    eval (I u) (rho t) = t`[xi].
+  Proof.
+    now induction t; cbn. (*???????????*)
+  Qed.
+*)
+
+ Section Contexts.
+
+    Program Instance K_frm_ctx {ff:falsity_flag} : kframe :=
+      {|
+        domain := term;
+        nodes := list form ;
+        reachable := @incl form ;
+        world := fun u t => True; (* this is wrong, I don't know what to put here*)
+      |}.
+
+  Instance model_bot : interp term :=
+    {| i_func := func; i_atom := fun P v => False|}.
+
+(*
+      Class kmodel := {
+        I : nodes -> interp domain;
+        
+        mon_f (u v:nodes) (f: syms) (vv: (t domain (ar_syms f))) (reach : reachable u v) (a : in_dom u vv): 
+           i_func (I u) f vv = i_func (I v) f vv;
+
+        k_f_wellDef u f vv (vv_in_dom : (in_dom u vv)): world u (i_func (I u) f vv) (*/\  in_dom u vv*);
+
+        mon_P (u v:nodes) (P: preds) (vv: (t domain (ar_preds P))) (reach : reachable u v) (a : in_dom u vv): 
+           i_atom (I u) P vv -> i_atom (I v) P vv;
+
+        k_P_wellDef u P vv: i_atom (I u) P vv -> in_dom u vv;
+      }.
+*)
+
+    Program Instance K_frm {ff: falsity_flag}: @kmodel _ _ K_frm_ctx:=
+    {|
+        I := fun (u: nodes) => model_bot;(* this is wrong, I don't know what to put here*)
+      |}.
+    (*
+    Next Obligation.
+      admit.
+    Next Obligation.
+      abstr
+      abstract (eauto using seq_Weak).
+    Qed.
+    *)
+        (*k_interp := model_bot ;
+        k_P := fun A P v => sprv A None (atom P v) ;*)
+        
+
+    Definition F_P {ff} : list (@form _ _ _ ff) -> Prop := match ff with falsity_on => fun (n: list form) => sprv n None ⊥ | _ => fun _ => False end.
+    Lemma mon_F {ff:falsity_flag} (u v : @nodes _ _ _ K_ctx) : reachable u v -> F_P u -> F_P v.
+    Proof.
+      cbn. unfold F_P. destruct ff; try easy. intros H H1. eapply seq_Weak; [ exact H1| exact H].
+    Qed.
+
+    Notation "rho '⊩⊥(' u , M ')' phi" :=  (@ksat_bot _ _ _ M _ F_P mon_F u rho phi) (at level 20).
+
+
+
   Program Definition kmodel_bot 
     (F_P : @nodes _ _ _ M -> Prop)
     (mon_F : forall u v, reachable u v -> F_P u -> F_P v)
