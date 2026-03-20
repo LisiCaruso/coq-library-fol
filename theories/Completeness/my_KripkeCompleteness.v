@@ -2,6 +2,7 @@
 
 From FOL Require Import FullSyntax Theories Deduction.FullSequentFacts Deduction.FragmentSequentFacts.
 
+
 From Undecidability.Synthetic Require Import Definitions DecidabilityFacts EnumerabilityFacts ListEnumerabilityFacts ReducibilityFacts.
 From Undecidability Require Import Shared.ListAutomation Shared.Dec.
 Require Import List Vector Lia.
@@ -171,14 +172,16 @@ End VariableDomainKripke.
 
 Arguments kmodel {_ _ _}.
 
-Section KripkeCompleteness.
+#[local] Ltac comp := repeat (progress (cbn in *; autounfold in *)).
+
+Section KripkeSat.
   Context {Σf : funcs_signature} {Σp : preds_signature}.
   Context {frm : kframe}.
 
   Context {M : kmodel}.
 (* Context {ff : falsity_flag} *)
 
-#[local] Ltac comp := repeat (progress (cbn in *; autounfold in *)).
+
 
     
     Arguments eval {_ _ _} _ _ _.
@@ -211,11 +214,11 @@ Section KripkeCompleteness.
       - eapply ksat_mon; eauto.
       - auto using reach_refl.
     Qed.
-
+    
   Notation "rho  '⊩(' u ')'  phi" := (ksat _ u rho phi) (at level 20).
   Notation "rho '⊩(' u , M ')' phi" := (@ksat _ _ _ M _ u rho phi) (at level 20).
-  Arguments ksat {_ _ _} _ _ _, _ _ _ _ _ _.
-
+  
+Arguments ksat {_ _ _} _ _ _, _ _ _ _ _ _.
   Hint Resolve reach_refl : core.
 
   Section Substs.
@@ -283,7 +286,7 @@ Section KripkeCompleteness.
             eauto using good_comp_reach, good_shift, good_mon. now eapply eval_mon_shift_up. 
           * eapply IHphi. 
             apply good_shift; eauto using  good_mon.
-            eapply ksat_ext; [ | | eapply H0]; eauto using H2; [|intros; erewrite eval_mon_shift_up]; 
+            eapply ksat_ext; [ | | eapply H0]; eauto using H2; [ |intros; erewrite eval_mon_shift_up]; 
             now eauto using good_comp, good_shift, good_mon.
         + split; intros.
           * destruct H0 as (j, (H0, H1)). exists j. split; try apply H0.
@@ -297,23 +300,132 @@ Section KripkeCompleteness.
   End Substs.
 
 
-  Context {ff : falsity_flag}.
+End KripkeSat. 
+
+
+  Notation "rho  '⊩(' u ')'  phi" := (ksat _ u rho phi) (at level 20).
+  Notation "rho '⊩(' u , M ')' phi" := (@ksat _ _ _ M _ u rho phi) (at level 20).
+
+
+Section Completeness.
+  Context {Σf : funcs_signature} {Σp : preds_signature}.
+  #[local] Existing Instance falsity_on.
+  Context {frm : kframe}.
+  Context {M : kmodel}.
+
+    
     Arguments ksat {_ _ _} _ {_} _, _ _ _ _ _ _.
 
+  Definition ktheo (M: kmodel)(phi : form) :=
+    forall rho u, good u rho -> ksat M u rho phi.
+    (*
+  Definition k_std 
+  Definition k_exp
+
+  I would need some characterization of bottom...
+  *)
+
+    Definition kvalid_ctx(*_e*) (A : list form) (phi: form) :=
+    forall (M: kmodel) (u: nodes) (rho: nat -> domain),
+     (*exp M -> *)
+     good u rho -> (forall psi, psi el A -> ksat M u rho psi) -> ksat M u rho phi.
+
+(*
   Definition kvalid_theo (T : form -> Prop) phi :=
   forall (M: kmodel) (u: nodes) (rho: nat -> domain), 
-  (forall psi, T psi -> ksat M  u rho psi) -> ksat M  u rho phi.
+  good u rho -> (forall psi, T psi -> ksat M u rho psi) -> ksat M u rho phi.
 
-  Definition kvalid_ctx A phi :=
+  Definition kvalid_ctx (A : list form) (phi: form) :=
     forall (M: kmodel) (u: nodes) (rho: nat -> domain),
-     (forall psi, psi el A -> ksat M u rho psi) -> ksat M u rho phi.
-
+     good u rho -> (forall psi, psi el A -> ksat M u rho psi) -> ksat M u rho phi.
+*)
   Definition kvalid phi :=
     forall (M: kmodel) (u: nodes) (rho: nat -> domain), 
-      ksat M u rho phi.
+    good u rho -> ksat M u rho phi.
 
   Definition ksatis phi :=
-    exists (M: kmodel) (u: nodes) (rho: nat -> domain), ksat M u rho phi.
+    exists (M: kmodel) (u: nodes) (rho: nat -> domain), good u rho /\ ksat M u rho phi.
+  
+  Locate "⊢S".
+  Locate fprv.
+  Locate "el". Print List.In.
+
+  Lemma contr_el {T: Type}(A : list T)(a b: T):
+    b el (a :: A) <-> b el (a :: a :: A).
+  Proof.
+    split; intros; induction H; try rewrite H; eauto. (*could use List.in_cons*)
+  Qed.
+
+  Lemma exchange_el {T: Type}(A B: list T)(a b c: T):
+   a el A ++ b :: c :: B <-> a el A ++ c :: b :: B.
+  Proof.
+    split; intros; eapply in_or_app; eapply in_app_or in H; destruct H.
+    + auto.
+    + induction H. right. apply in_cons. rewrite H. auto.
+      right. induction H. rewrite H. auto.
+      apply in_cons. auto.
+    + left; auto .
+    + induction H. 
+      rewrite H. right. apply in_cons. auto.
+      induction H. 
+      right. rewrite H. auto.
+      right. apply in_cons. auto.
+  Qed.
+
+  Lemma contraction_kvalid_ctx (A : list form)(a b: form):
+    kvalid_ctx (a :: a :: A) b <-> kvalid_ctx (a :: A) b.
+  Proof.
+    unfold kvalid_ctx. split; intros; eapply H; intros; auto. apply H1.
+    now eapply contr_el.
+  Qed.
+
+  Lemma and_left (A : list form)(a b c : form) u rho:
+    good u rho ->
+    (kvalid_ctx ((bin Conj a b) :: A) c -> rho ⊩( u, M) c )<-> (kvalid_ctx (a::b::A) c-> rho ⊩( u, M) c).
+  Proof.
+    intros; split; intros.
+    + eapply H0. unfold kvalid_ctx. intros. eapply H1. apply H2. intros. eapply H3. induction H4.
+        
+
+  (*I was "forced" to use fprv (sequent calculus) instead of sprv (ND)
+  because, when trying to use sprv I get a conflict of connectives. 
+  Of course it's easier in my opinion to use ND, nevertheless I did not know how to proceed *)
+
+  Lemma soundness (A : list form)(phi: form):
+     A ⊢f phi -> @kvalid_ctx A phi.
+  Proof. 
+    intros; induction H; unfold kvalid_ctx.
+    * intros; auto.
+    * now apply contraction_kvalid_ctx.  
+    * intros; apply IHfprv; intros; eauto.
+    * intros; apply IHfprv; intros; eauto; apply H1.
+      eapply exchange_el. auto.
+    * (* Exp A phi : fprv A ⊥ -> fprv A phi *)
+      admit.
+    * (*IL A phi psi chi : 
+      fprv A phi -> fprv (psi :: A) chi -> fprv (phi → psi :: A) chi*)
+      intros. apply IHfprv2. intros. apply H1. admit.
+    * simpl. intros. apply IHfprv.
+      now eapply good_mon. intros. induction H4.
+      + rewrite <- H4. apply H3.
+      + eapply ksat_mon; now auto. 
+    * intros. apply IHfprv. apply H0. intros. apply H1.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 Section Bottom.
@@ -321,28 +433,34 @@ Section Bottom.
   Context {Σ_funcs : funcs_signature}.
   Context {Σ_preds : preds_signature}.
 
-  (*
-  Questo ` è subst_term. 
-    Fixpoint subst_term (σ : nat -> term) (t : term) : term :=
-    match t with
-    | var t => σ t
-    | func f v => func f (map (subst_term σ) v)
-    end.
-
-*)
-
   Locate subst_term.
 
-    (*
-  Lemma universal_interp_eval (rho: nat -> domain) (u: nodes) (t: term) :
-    eval (I u) (rho t) = t`[xi].
+ (* Lemma universal_interp_eval u rho t :
+    eval rho t= t`[rho].
   Proof.
-    now induction t; cbn. (*???????????*)
+    now induction t; cbn. 
   Qed.
 *)
+  Instance model_bot : interp term :=
+    {| i_func := func; i_atom := fun P v => False|}.
 
  Section Contexts.
 
+  Print Vector.map.
+(*
+  Fixpoint term_in_form (nu : form)(t : term): Prop :=
+    match nu with 
+      | atom P vv => term_in_term ()
+      | falsity => False
+      | bin _ phi psi => term_in_form phi \/ term_in_form psi
+      | quant _ phi =>  term_in_form phi
+      end.
+
+  Fixpoint world_ctx (A : list form)(t : term): Prop :=
+    match A with 
+      | [] => False
+      | [phi] => 
+*)
     Program Instance K_frm_ctx {ff:falsity_flag} : kframe :=
       {|
         domain := term;
@@ -351,28 +469,9 @@ Section Bottom.
         world := fun u t => True; (* this is wrong, I don't know what to put here*)
       |}.
 
-  Instance model_bot : interp term :=
-    {| i_func := func; i_atom := fun P v => False|}.
-
-(*
-      Class kmodel := {
-        I : nodes -> interp domain;
-        
-        mon_f (u v:nodes) (f: syms) (vv: (t domain (ar_syms f))) (reach : reachable u v) (a : in_dom u vv): 
-           i_func (I u) f vv = i_func (I v) f vv;
-
-        k_f_wellDef u f vv (vv_in_dom : (in_dom u vv)): world u (i_func (I u) f vv) (*/\  in_dom u vv*);
-
-        mon_P (u v:nodes) (P: preds) (vv: (t domain (ar_preds P))) (reach : reachable u v) (a : in_dom u vv): 
-           i_atom (I u) P vv -> i_atom (I v) P vv;
-
-        k_P_wellDef u P vv: i_atom (I u) P vv -> in_dom u vv;
-      }.
-*)
-
-    Program Instance K_frm {ff: falsity_flag}: @kmodel _ _ K_frm_ctx:=
+  Program Instance K_ctx {ff: falsity_flag}: @kmodel _ _ K_frm_ctx:=
     {|
-        I := fun (u: nodes) => model_bot;(* this is wrong, I don't know what to put here*)
+        I := fun (u: nodes) => model_bot; 
       |}.
     (*
     Next Obligation.
@@ -383,11 +482,18 @@ Section Bottom.
     Qed.
     *)
         (*k_interp := model_bot ;
-        k_P := fun A P v => sprv A None (atom P v) ;*)
+        k_P := fun A P v => sprv A None (atom P v) 
         
 
-    Definition F_P {ff} : list (@form _ _ _ ff) -> Prop := match ff with falsity_on => fun (n: list form) => sprv n None ⊥ | _ => fun _ => False end.
-    Lemma mon_F {ff:falsity_flag} (u v : @nodes _ _ _ K_ctx) : reachable u v -> F_P u -> F_P v.
+Print FragmentSyntax.frag_operators.
+Print FullSyntax.full_operators.
+
+    Definition F_P {ff} : list (@form _ _ _ ff) -> Prop := 
+        match ff with 
+        | falsity_on => fun (n: list form) => sprv n Some ⊥ (*taken away sprv and Some*)
+        | _ => fun _ => False end.
+
+    Lemma mon_F {ff:falsity_flag} (u v : nodes) : reachable u v -> F_P u -> F_P v.
     Proof.
       cbn. unfold F_P. destruct ff; try easy. intros H H1. eapply seq_Weak; [ exact H1| exact H].
     Qed.
@@ -458,6 +564,8 @@ Section BottomDef.
 End BottomDef.
 
   Section Contexts.
+
+    
 
     Program Instance K_ctx {ff:falsity_flag} : kmodel :=
       {|
@@ -568,7 +676,7 @@ End BottomDef.
       now destruct (K_ctx_correct_exp A rho phi).
     Qed.
  
-    #[local] Existing Instance falsity_off.
+    #[local] Existing Instance falsity_off. 
 
     Lemma K_ctx_correct (A : list form) rho phi :
       (rho ⊩(A, K_ctx ) phi-> A ⊢S phi[rho]) /\
@@ -915,3 +1023,4 @@ End BottomDef.
   End LEM_Equivalence.
 
 End KripkeCompleteness.
+*)
