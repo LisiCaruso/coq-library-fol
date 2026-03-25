@@ -309,9 +309,7 @@ Arguments ksat {_ _ _} _ _ _, _ _ _ _ _ _.
 
   End Substs.
 
-
 End KripkeSat. 
-
 
   Notation "rho  '⊩(' u ')'  phi" := (ksat _ u rho phi) (at level 20).
   Notation "rho '⊩(' u , M ')' phi" := (@ksat _ _ _ M _ u rho phi) (at level 20).
@@ -331,16 +329,12 @@ Section Completeness.
     forall rho u, good u rho -> ksat M u rho phi.
     (*
   Definition k_std 
-  Definition k_exp
-
-  I would need some characterization of bottom...
+  Definition k_exp ???
   *)
-
     Definition kvalid_ctx(*_e*) {ff : falsity_flag}(A : list form) (phi: form) :=
     forall (M: kmodel) (u: nodes) (rho: nat -> domain),
      (*exp M -> *)
      good u rho -> (forall psi, psi el A -> ksat M u rho psi) -> ksat M u rho phi.
-
 (*
   Definition kvalid_theo (T : form -> Prop) phi :=
   forall (M: kmodel) (u: nodes) (rho: nat -> domain), 
@@ -356,78 +350,9 @@ Section Completeness.
 
   Definition ksatis {ff : falsity_flag} phi :=
     exists (M: kmodel) (u: nodes) (rho: nat -> domain), good u rho /\ ksat M u rho phi.
-(*
-  Lemma contr_el {T: Type}(A : list T)(a b: T):
-    b el (a :: A) <-> b el (a :: a :: A).
-  Proof.
-    split; intros; induction H; try rewrite H; eauto. (*could use List.in_cons*)
-  Qed.
+  Context {p : peirce}.
 
-  Lemma exchange_el {T: Type}(A B: list T)(a b c: T):
-   a el A ++ b :: c :: B <-> a el A ++ c :: b :: B.
-  Proof.
-    split; intros; eapply in_or_app; eapply in_app_or in H; destruct H.
-    + auto.
-    + induction H. right. apply in_cons. rewrite H. auto.
-      right. induction H. rewrite H. auto.
-      apply in_cons. auto.
-    + left; auto .
-    + induction H. 
-      rewrite H. right. apply in_cons. auto.
-      induction H. 
-      right. rewrite H. auto.
-      right. apply in_cons. auto.
-  Qed.
-
-  Lemma contraction_kvalid_ctx (A : list form)(a b: form):
-    kvalid_ctx (a :: a :: A) b <-> kvalid_ctx (a :: A) b.
-  Proof.
-    unfold kvalid_ctx. split; intros; eapply H; intros; auto. apply H1.
-    now eapply contr_el.
-  Qed.
-
-  Lemma and_left (A : list form)(a b c : form) u rho:
-    good u rho ->
-    (kvalid_ctx ((bin Conj a b) :: A) c -> rho ⊩( u, M) c )<-> (kvalid_ctx (a::b::A) c-> rho ⊩( u, M) c).
-  Proof.
-    intros; split; intros.
-    + eapply H0. unfold kvalid_ctx. intros. eapply H1. apply H2. intros. eapply H3. induction H4.
-        
-
-  I was "forced" to use fprv (sequent calculus) instead of sprv (ND)
-  because, when trying to use sprv I get a conflict of connectives. 
-  Of course it's easier in my opinion to use ND, nevertheless I did not know how to proceed *)
-
-Implicit Type p : peirce.
-Context {p : peirce}.
-
-  Lemma kvalid_ctx_shift {ff : falsity_flag} (A : list form)(phi: form):
-  kvalid_ctx A phi <-> kvalid_ctx (List.map (subst_form ↑) A) phi [↑].
-  Proof.
-    split; unfold kvalid_ctx; intros.
-    * apply ksat_comp; eauto.
-      eapply H. now eapply good_comp.
-      intros. eapply ksat_comp; eauto.
-      eapply (in_map (subst_form ↑)) in H2; eauto.
-    * eapply ksat_ext. 3: eapply (ksat_comp ↑ phi). 3: eapply (good_shift H0).
-
-
-    
-      4: eapply H.
-
-      4: eapply ksat_comp.
-    
-     3: eapply ksat_comp. 4: eapply H.
-      apply H0. 
-      4: intros. 4: eapply (ksat_comp ↑ psi). 4: eapply H.
-      (*
-      5: eapply H. 
-      5: intros. 5: exact ((↑ >> eval rho) ⊩( u, M) psi).
-*)
-    
-    Search List.map.
-
-
+  Search List.map.
 
   Lemma soundness {ff : falsity_flag} (A : list form)(phi: form):
      A ⊢I phi -> kvalid_ctx A phi.
@@ -453,35 +378,14 @@ Context {p : peirce}.
       eapply ksat_ext. eapply good_shift; eauto using good_eval.
       2: eapply IHprv. 
       intros. induction x; cbn; reflexivity.
-    *  (*ExE {ff} {p} A phi psi : 
-    A ⊢ ∃ phi -> phi::(map (subst_form ↑) A) ⊢ psi[↑] ->      A ⊢ psi  *)
-    (*
-    
-    
-    specialize (IHprv1 u rho gd Hp); simpl in IHprv1; destruct IHprv1 as [j (wj, HH)].
-      erewrite ksat_shift; eauto. 
+    * specialize (IHprv1 u rho gd Hp); simpl in IHprv1.
+      destruct IHprv1 as [j (wj, IH)].
+      eapply ksat_shift; eauto.
       eapply IHprv2; eauto using good_shift.
-      intros. simpl in H1. destruct H1 as [HH1 | HH2].
-      rewrite <- HH1. apply HH.
-      rewrite ksat_ext. apply Hp.
-
-      eapply Hp.
-      split; intros. rewrite ksat_comp. eapply ksat_ext. 3: apply H1.
-      eauto
-
-    assert( rho ⊩( u, M) psi [↑] <->( (↑ >> @eval _ _ _ (I u) rho) ⊩( u, M) psi)).
-      now apply ksat_comp.
-      apply H1 in IHprv2. eapply  
-    
-    simpl in IHprv1; specialize (IHprv1 u rho gd Hp); destruct IHprv1 as [j HHH].
-    
-    simpl in IHprv2. 
-      erewrite in_map_iff in IHprv2.
-      specialize (IHprv1 u rho gd Hp); simpl in IHprv1; destruct IHprv1 as [j HHH].
-      eapply Hp.
-      eapply ksat_comp in IHfprv2.
-
-    subsimpl_in IHprv2.     *) admit.
+      intros; simpl in H1; destruct H1.
+      rewrite <- H1; eauto.
+      eapply in_map_iff in H1; destruct H1 as [psh (eq, xelA)].
+      rewrite <- eq; erewrite <- ksat_shift; eauto.
     * simpl in IHprv. specialize (IHprv u rho gd Hp); eauto. 
     * apply Hp; eauto.
     * split; [eapply IHprv1 | eapply IHprv2]; eauto.
@@ -491,7 +395,10 @@ Context {p : peirce}.
     * right; eapply IHprv; eauto.
     * specialize (IHprv1 u rho gd Hp); simpl in IHprv1; destruct IHprv1 as [IH1 | IH2];
       [eapply  IHprv2 | eapply IHprv3]; eauto; intros; simpl in H2; destruct H2 as [HH1 | HH2]; try rewrite <- HH1; eauto.
+    * admit.
   Admitted.
+
+  
 
     Locate ListAutomationNotations.
 
