@@ -82,7 +82,7 @@ Lemma good_eval (u : nodes) (rho : nat -> domain) (t : term):
   Proof.
     intros. induction t.
     * eauto.
-    * cbn. 
+    * cbn.  
       apply k_f_wellDef.  unfold in_dom.
       intros x [a [b <-]] % vector_in_map. now apply IH.
 Qed.
@@ -104,7 +104,7 @@ Qed.
         erewrite map_ext_in.
         apply mon_f. apply H0. unfold in_dom.
         intros x [a [b <-]] % vector_in_map. 
-        erewrite <- IH. 
+        erewrite <- IH.  
         now eapply good_eval.
         apply b. apply IH.
   Qed.     
@@ -315,7 +315,7 @@ End KripkeSat.
   Notation "rho '⊩(' u , M ')' phi" := (@ksat _ _ _ M _ u rho phi) (at level 20).
 
 
-Section Completeness.
+Section Soundness.
   Context {Σf : funcs_signature} {Σp : preds_signature}.
   (* #[local] Existing Instance falsity_on.*)
 
@@ -323,7 +323,7 @@ Section Completeness.
   (* Context {M : kmodel}. *) 
 
     
-    Arguments ksat {_ _ _} _ {_} _, _ _ _ _ _ _.
+  Arguments ksat {_ _ _} _ {_} _, _ _ _ _ _ _.
 
   Definition ktheo (M: kmodel)(phi : form) :=
     forall rho u, good u rho -> ksat M u rho phi.
@@ -350,12 +350,11 @@ Section Completeness.
 
   Definition ksatis {ff : falsity_flag} phi :=
     exists (M: kmodel) (u: nodes) (rho: nat -> domain), good u rho /\ ksat M u rho phi.
-  Context {p : peirce}.
 
   Search List.map.
 
   Lemma soundness {ff : falsity_flag} (A : list form)(phi: form):
-     A ⊢I phi -> kvalid_ctx A phi.
+     A ⊢I  phi -> kvalid_ctx A phi.
   Proof. 
     unfold kvalid_ctx. intros H M. 
     induction H; simpl; intros u rho gd Hp; intros; try  simpl in IHprv. (*eapply IHprv; eauto.*)
@@ -394,9 +393,124 @@ Section Completeness.
     * left; eapply IHprv; eauto.
     * right; eapply IHprv; eauto.
     * specialize (IHprv1 u rho gd Hp); simpl in IHprv1; destruct IHprv1 as [IH1 | IH2];
-      [eapply  IHprv2 | eapply IHprv3]; eauto; intros; simpl in H2; destruct H2 as [HH1 | HH2]; try rewrite <- HH1; eauto.
-    * admit.
+      [eapply  IHprv2 | eapply IHprv3]; eauto; intros; simpl in H2; destruct H2 as [HH1 | HH2]; try rewrite <- HH1; eauto.  
+    * (*discriminate. ???? *)
+    admit.
   Admitted.
+
+End Soundness.
+
+  Section ExampleKmodel.
+
+    Instance Σ_funcs : funcs_signature :=
+      {|
+        syms := Empty_set;
+        ar_syms := fun _ => 0;
+      |}.
+
+    Instance Σ_preds : preds_signature :=
+      {|
+        preds := unit;
+        ar_preds := fun x => 1;
+      |}.
+    Instance ff : falsity_flag := falsity_on.
+
+
+    Inductive my_domain : Type :=
+      | a : my_domain
+      | b : my_domain.
+
+    Inductive my_nodes : Type :=
+      | v : my_nodes
+      | w : my_nodes.
+
+    Definition my_reach x y: Prop :=
+      match x with 
+      | v => True
+      | w => match y with
+            | w => True
+            | _ => False
+            end
+      end.
+
+    Definition my_world node t: Prop :=
+      match node with 
+      | v => match t with 
+            | a => True
+            | b => False
+            end
+      | w => True
+    end.
+
+    Program Instance ex_frm : kframe :=
+      {|
+        domain := my_domain;
+        nodes := my_nodes;
+        reachable := my_reach;
+        world := my_world;
+      |}.
+    Next Obligation.
+      induction u; simpl; eauto.
+    Qed.
+    Next Obligation.
+      induction u; induction v0; induction w0; eauto.
+    Qed.
+    Next Obligation.
+      induction u; induction v0; induction x; eauto.
+    Qed.
+      
+    Print t.
+
+    Instance my_I_v : @interp Σ_funcs Σ_preds my_domain :=
+      {| 
+        i_func := fun _ _ => a; 
+        i_atom := fun P x => False
+      |}.
+
+    Instance my_I_w : @interp Σ_funcs Σ_preds my_domain :=
+      {| 
+        i_func := fun _ _ => a; 
+        i_atom := fun P x => match (ar_preds P) with 
+                            | 1 => match x with
+                                  | cons _ b _ _ => True
+                                  | cons _ a _ _ => False
+                                  | _ => False
+                                  end
+                            | _ => False
+                            end |}.
+            
+    Print interp.
+
+    Program Instance my_kmodel: @kmodel _ _ ex_frm :=
+    {|
+        I := fun (u: nodes) => match u with 
+                              | v => my_I_v
+                              | w => my_I_w 
+                              end
+      |}.
+    Next Obligation.
+      induction u; induction v0; simpl; reflexivity.
+    Qed.
+    Next Obligation.
+      induction u; induction v; simpl; auto.
+    Qed.
+    Next Obligation.
+      induction u; induction v0; simpl; auto.
+      dependent destruction vv; destruct h; auto.
+    Qed.
+    Next Obligation.
+      induction u; induction x; simpl; auto.
+    Qed.
+
+
+      
+
+
+    
+  End ExampleKmodel.
+
+
+
 
   
 
