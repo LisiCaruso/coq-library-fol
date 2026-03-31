@@ -167,7 +167,7 @@ Qed.
     Qed.
 
       
-    
+  
 End VariableDomainKripke.
 
 Arguments kmodel {_ _ _}.
@@ -351,51 +351,243 @@ Section Soundness.
   Definition ksatis {ff : falsity_flag} phi :=
     exists (M: kmodel) (u: nodes) (rho: nat -> domain), good u rho /\ ksat M u rho phi.
 
-  Search List.map.
+  Print prv.
+  About prv.
 
-  Lemma soundness {ff : falsity_flag} (A : list form)(phi: form):
-     A ⊢I  phi -> kvalid_ctx A phi.
-  Proof. 
-    unfold kvalid_ctx. intros H M. 
-    induction H; simpl; intros u rho gd Hp; intros; try  simpl in IHprv. (*eapply IHprv; eauto.*)
-    * eapply IHprv; eauto using good_mon.
-      simpl; intros. destruct H2; [rewrite <- H2 | eapply ksat_mon]; eauto.
-    * eapply IHprv1; try eapply IHprv2; eauto using reach_refl. 
-    * apply IHprv; eauto using good_mon, good_shift.
-       intros psi [psi' [<- HH]] % in_map_iff. 
-       rewrite ksat_comp; eauto using good_mon, good_shift.
-       eapply ksat_mon; eauto using good_comp.
+  Definition prv_intu_on := @prv _ _ (falsity_on) intu.
+
+  Lemma prv_ind_intu_falsity_on:
+  forall P : peirce -> list (form falsity_on) -> form falsity_on -> Prop,
+    (forall (A : list form) (phi psi : form),
+        prv_intu_on (phi :: A) psi -> P intu (phi :: A) psi -> P intu A (phi → psi)) ->
+    (forall (A : list form) (phi psi : form),
+         prv_intu_on A (phi → psi) -> P intu A (phi → psi) -> prv_intu_on A phi -> P intu A phi -> P intu A psi) ->
+    (forall (A : list form) (phi : form),
+        prv_intu_on (List.map (subst_form ↑) A) phi -> P intu (List.map (subst_form ↑) A) phi -> P intu A (∀ phi)) ->
+    (forall (A : list form) (t : term) (phi : form),
+        prv_intu_on A (∀ phi) -> P intu A (∀ phi) -> P intu A phi[t..]) ->
+    (forall (A : list form) (t : term) (phi : form),
+        prv_intu_on A phi[t..] -> P intu A phi[t..] -> P intu A (∃ phi)) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_on A (∃ phi) ->
+              P intu A (∃ phi) ->
+              prv_intu_on (phi :: [p[↑] | p ∈ A]) (psi[↑]) ->  P intu (phi :: [p[↑] | p ∈ A]) psi[↑] -> P intu A psi) ->
+    (forall (A : list form) (phi : form), prv_intu_on A ⊥ -> P intu A ⊥ -> P intu A phi) ->
+    (forall (A : list form) (phi : form), phi el A -> P intu A phi) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_on A phi -> P intu A phi -> prv_intu_on A psi -> P intu A psi -> P intu A (phi ∧ psi)) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_on A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A phi) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_on A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A psi) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_on A phi -> P intu A phi -> P intu A (phi ∨ psi)) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_on A psi -> P intu A psi -> P intu A (phi ∨ psi)) ->
+    (forall (A : list form) (phi psi theta : form),
+        prv_intu_on A (phi ∨ psi) ->
+        P intu A (phi ∨ psi) ->
+        prv_intu_on (phi :: A) theta ->
+        P intu (phi :: A) theta -> prv_intu_on (psi :: A) theta -> P intu (psi :: A) theta -> P intu A theta) ->
+    forall (l : list form) (f14 : form), prv_intu_on l f14 -> P intu l f14.
+Proof.
+  intros. 
+  specialize (@prv_ind _ _ (fun ff => match ff with 
+                                      | falsity_on =>  (fun p => match p with 
+                                                        | intu => P intu 
+                                                        | _ => fun  _ _ => True end)
+                                      | _           => fun  _ _ _=> True end)).  intros H'.
+  apply H' with (ff := falsity_on) (p := intu); clear H'; intros; try destruct ff; try destruct p;
+  trivial; intuition eauto 2.
+Qed.
+
+Definition prv_intu_off := @prv _ _ (falsity_off) intu.
+
+Lemma prv_ind_intu_falsity_off:
+  forall P : peirce -> list (form falsity_off) -> form falsity_off -> Prop,
+    (forall (A : list (form falsity_off)) (phi psi : form falsity_off),
+        prv_intu_off (phi :: A) psi -> P intu (phi :: A) psi -> P intu A (phi → psi)) ->
+    (forall (A : list form) (phi psi : form),
+         prv_intu_off A (phi → psi) -> P intu A (phi → psi) -> prv_intu_off A phi -> P intu A phi -> P intu A psi) ->
+    (forall (A : list form) (phi : form),
+        prv_intu_off (List.map (subst_form ↑) A) phi -> P intu (List.map (subst_form ↑) A) phi -> P intu A (∀ phi)) ->
+    (forall (A : list form) (t : term) (phi : form),
+        prv_intu_off A (∀ phi) -> P intu A (∀ phi) -> P intu A phi[t..]) ->
+    (forall (A : list form) (t : term) (phi : form),
+        prv_intu_off A phi[t..] -> P intu A phi[t..] -> P intu A (∃ phi)) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_off A (∃ phi) ->
+              P intu A (∃ phi) ->
+              prv_intu_off (phi :: [p[↑] | p ∈ A]) (psi[↑]) ->  P intu (phi :: [p[↑] | p ∈ A]) psi[↑] -> P intu A psi) ->
+    (forall (A : list form) (phi : form), phi el A -> P intu A phi) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_off A phi -> P intu A phi -> prv_intu_off A psi -> P intu A psi -> P intu A (phi ∧ psi)) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_off A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A phi) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_off A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A psi) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_off A phi -> P intu A phi -> P intu A (phi ∨ psi)) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_off A psi -> P intu A psi -> P intu A (phi ∨ psi)) ->
+    (forall (A : list form) (phi psi theta : form),
+        prv_intu_off A (phi ∨ psi) ->
+        P intu A (phi ∨ psi) ->
+        prv_intu_off (phi :: A) theta ->
+        P intu (phi :: A) theta -> prv_intu_off (psi :: A) theta -> P intu (psi :: A) theta -> P intu A theta) ->
+    forall (l : list form) (f14 : form), prv_intu_off l f14 -> P intu l f14.
+Proof.
+  intros. 
+  specialize (@prv_ind _ _ (fun ff => match ff with 
+                                      | falsity_off =>  (fun p => match p with 
+                                                        | intu => P intu 
+                                                        | _ => fun  _ _ => True end)
+                                      | _           => fun  _ _ _=> True end)).  intros H'.
+  apply H' with (ff := falsity_off) (p := intu); clear H'; intros; try destruct ff; try destruct p;
+  trivial; intuition eauto 2.
+Qed.
+
+Definition prv_intu (ff : falsity_flag):= 
+  match ff with 
+  | falsity_on => prv_intu_on
+  | falsity_off => prv_intu_off
+  end.
+
+Lemma prv_intu_ind (ff : falsity_flag):
+  (ff = falsity_off -> (
+  forall P : peirce -> list (form falsity_off) -> form falsity_off -> Prop,
+    (forall (A : list (form falsity_off)) (phi psi : form falsity_off),
+        prv_intu_off (phi :: A) psi -> P intu (phi :: A) psi -> P intu A (phi → psi)) ->
+    (forall (A : list form) (phi psi : form),
+         prv_intu_off A (phi → psi) -> P intu A (phi → psi) -> prv_intu_off A phi -> P intu A phi -> P intu A psi) ->
+    (forall (A : list form) (phi : form),
+        prv_intu_off (List.map (subst_form ↑) A) phi -> P intu (List.map (subst_form ↑) A) phi -> P intu A (∀ phi)) ->
+    (forall (A : list form) (t : term) (phi : form),
+        prv_intu_off A (∀ phi) -> P intu A (∀ phi) -> P intu A phi[t..]) ->
+    (forall (A : list form) (t : term) (phi : form),
+        prv_intu_off A phi[t..] -> P intu A phi[t..] -> P intu A (∃ phi)) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_off A (∃ phi) ->
+              P intu A (∃ phi) ->
+              prv_intu_off (phi :: [p[↑] | p ∈ A]) (psi[↑]) ->  P intu (phi :: [p[↑] | p ∈ A]) psi[↑] -> P intu A psi) ->
+    (forall (A : list form) (phi : form), phi el A -> P intu A phi) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_off A phi -> P intu A phi -> prv_intu_off A psi -> P intu A psi -> P intu A (phi ∧ psi)) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_off A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A phi) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_off A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A psi) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_off A phi -> P intu A phi -> P intu A (phi ∨ psi)) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_off A psi -> P intu A psi -> P intu A (phi ∨ psi)) ->
+    (forall (A : list form) (phi psi theta : form),
+        prv_intu_off A (phi ∨ psi) ->
+        P intu A (phi ∨ psi) ->
+        prv_intu_off (phi :: A) theta ->
+        P intu (phi :: A) theta -> prv_intu_off (psi :: A) theta -> P intu (psi :: A) theta -> P intu A theta) ->
+    forall (l : list form) (f14 : form), prv_intu_off l f14 -> P intu l f14 )) /\
+    (ff = falsity_on -> (forall P : peirce -> list (form falsity_on) -> form falsity_on -> Prop,
+    (forall (A : list form) (phi psi : form),
+        prv_intu_on (phi :: A) psi -> P intu (phi :: A) psi -> P intu A (phi → psi)) ->
+    (forall (A : list form) (phi psi : form),
+         prv_intu_on A (phi → psi) -> P intu A (phi → psi) -> prv_intu_on A phi -> P intu A phi -> P intu A psi) ->
+    (forall (A : list form) (phi : form),
+        prv_intu_on (List.map (subst_form ↑) A) phi -> P intu (List.map (subst_form ↑) A) phi -> P intu A (∀ phi)) ->
+    (forall (A : list form) (t : term) (phi : form),
+        prv_intu_on A (∀ phi) -> P intu A (∀ phi) -> P intu A phi[t..]) ->
+    (forall (A : list form) (t : term) (phi : form),
+        prv_intu_on A phi[t..] -> P intu A phi[t..] -> P intu A (∃ phi)) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_on A (∃ phi) ->
+              P intu A (∃ phi) ->
+              prv_intu_on (phi :: [p[↑] | p ∈ A]) (psi[↑]) ->  P intu (phi :: [p[↑] | p ∈ A]) psi[↑] -> P intu A psi) ->
+    (forall (A : list form) (phi : form), prv_intu_on A ⊥ -> P intu A ⊥ -> P intu A phi) ->
+    (forall (A : list form) (phi : form), phi el A -> P intu A phi) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_on A phi -> P intu A phi -> prv_intu_on A psi -> P intu A psi -> P intu A (phi ∧ psi)) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_on A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A phi) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_on A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A psi) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_on A phi -> P intu A phi -> P intu A (phi ∨ psi)) ->
+    (forall (A : list form) (phi psi : form),
+        prv_intu_on A psi -> P intu A psi -> P intu A (phi ∨ psi)) ->
+    (forall (A : list form) (phi psi theta : form),
+        prv_intu_on A (phi ∨ psi) ->
+        P intu A (phi ∨ psi) ->
+        prv_intu_on (phi :: A) theta ->
+        P intu (phi :: A) theta -> prv_intu_on (psi :: A) theta -> P intu (psi :: A) theta -> P intu A theta) ->
+    forall (l : list form) (f14 : form), prv_intu_on l f14 -> P intu l f14)).
+Proof.
+  split.
+  induction ff. 
+    * intros. 
+      specialize (@prv_ind _ _ (fun ff => match ff with 
+                                        | falsity_off =>  (fun p => match p with 
+                                                          | intu => P intu 
+                                                          | _ => fun  _ _ => True end)
+                                        | _           => fun  _ _ _=> True end));  intros H';
+      apply H' with (ff := falsity_off) (p := intu); clear H'; intros; try destruct ff; try destruct p;
+      trivial; intuition eauto 2.
+    * intros. discriminate H. 
+    * intros.  
+      specialize (@prv_ind _ _ (fun ff => match ff with 
+                                          | falsity_on =>  (fun p => match p with 
+                                                            | intu => P intu 
+                                                            | _ => fun  _ _ => True end)
+                                          | _           => fun  _ _ _=> True end));  intros H';
+      apply H' with (ff := falsity_on) (p := intu); clear H'; intros; try destruct ff0; try destruct p;
+      trivial; intuition eauto 2.
+Qed.
+
+  Lemma soundness_on {ff : falsity_flag} (A : list (form falsity_on))(phi: (form falsity_on)):
+    ff = falsity_on -> prv_intu_on A phi -> kvalid_ctx A phi.
+  Proof.
+    intros;
+    unfold kvalid_ctx. intros M.
+    induction H0 using prv_ind_intu_falsity_on; simpl;  intros u rho gd Hp; intros; 
+    try simpl in IHprv_intu_on.
+    * eapply IHprv_intu_on; eauto using good_mon.
+      simpl; intros. destruct H3; [rewrite <- H3 | eapply ksat_mon]; eauto.
+    * simpl in IHprv_intu_on1; eapply IHprv_intu_on1. 4: eapply  IHprv_intu_on2. 
+      all: eauto using reach_refl.
+    * eapply IHprv_intu_on; eauto using good_mon, good_shift.
+      intros psi [psi' [<- HH]] % in_map_iff. 
+      rewrite ksat_comp; eauto using good_mon, good_shift.
+      eapply ksat_mon; eauto using good_comp.
     * erewrite ksat_comp; eauto. 
-      erewrite ksat_ext.
+      erewrite ksat_ext. 
       eapply (IHprv u rho gd Hp u (reach_refl u) (eval rho t)).
       all: eauto using reach_refl, good_comp, good_eval.
-      intros; unfold ">>"; induction x; simpl; reflexivity.
+      intros; unfold ">>"; induction x; simpl; reflexivity. 
     * exists (@eval _ _  _ (I u) rho t); split.
       now eapply good_eval.
-      specialize (IHprv u rho).  
+      specialize (IHprv (eq_refl) u rho);  admit. (*
       apply ksat_comp in IHprv; eauto.
       eapply ksat_ext. eapply good_shift; eauto using good_eval.
       2: eapply IHprv. 
-      intros. induction x; cbn; reflexivity.
-    * specialize (IHprv1 u rho gd Hp); simpl in IHprv1.
+      intros. induction x; cbn; reflexivity. *)
+    *  admit. (*specialize (IHprv1 u rho gd Hp); simpl in IHprv1.
       destruct IHprv1 as [j (wj, IH)].
       eapply ksat_shift; eauto.
       eapply IHprv2; eauto using good_shift.
       intros; simpl in H1; destruct H1.
       rewrite <- H1; eauto.
       eapply in_map_iff in H1; destruct H1 as [psh (eq, xelA)].
-      rewrite <- eq; erewrite <- ksat_shift; eauto.
-    * simpl in IHprv. specialize (IHprv u rho gd Hp); eauto. 
+      rewrite <- eq; erewrite <- ksat_shift; eauto. *)
+    *  admit. (* simpl in IHprv. specialize (IHprv u rho gd Hp); eauto. *)
     * apply Hp; eauto.
     * split; [eapply IHprv1 | eapply IHprv2]; eauto.
     * simpl in IHprv. eapply IHprv; eauto.
     * simpl in IHprv. eapply IHprv; eauto.
     * left; eapply IHprv; eauto.
     * right; eapply IHprv; eauto.
-    * specialize (IHprv1 u rho gd Hp); simpl in IHprv1; destruct IHprv1 as [IH1 | IH2];
+    * admit. (*specialize (IHprv1 u rho gd Hp); simpl in IHprv1; destruct IHprv1 as [IH1 | IH2];
       [eapply  IHprv2 | eapply IHprv3]; eauto; intros; simpl in H2; destruct H2 as [HH1 | HH2]; try rewrite <- HH1; eauto.  
-    * (*discriminate. ???? *)
-    admit.
+    * discriminate. ???? *) 
+    * discriminate. 
   Admitted.
 
 End Soundness.
