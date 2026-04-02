@@ -559,40 +559,164 @@ Qed.
       eapply ksat_mon; eauto using good_comp.
     * erewrite ksat_comp; eauto. 
       erewrite ksat_ext. 
-      eapply (IHprv u rho gd Hp u (reach_refl u) (eval rho t)).
+      eapply (IHprv_intu_on u rho gd Hp u (reach_refl u) (eval rho t)).
       all: eauto using reach_refl, good_comp, good_eval.
       intros; unfold ">>"; induction x; simpl; reflexivity. 
     * exists (@eval _ _  _ (I u) rho t); split.
       now eapply good_eval.
-      specialize (IHprv (eq_refl) u rho);  admit. (*
-      apply ksat_comp in IHprv; eauto.
+      specialize (IHprv_intu_on  u rho);  
+      apply ksat_comp in IHprv_intu_on; eauto.
       eapply ksat_ext. eapply good_shift; eauto using good_eval.
-      2: eapply IHprv. 
-      intros. induction x; cbn; reflexivity. *)
-    *  admit. (*specialize (IHprv1 u rho gd Hp); simpl in IHprv1.
-      destruct IHprv1 as [j (wj, IH)].
+      2: eapply IHprv_intu_on. 
+      intros. induction x; cbn; reflexivity.
+    * specialize (IHprv_intu_on1 u rho gd Hp); simpl in IHprv_intu_on1.
+      destruct IHprv_intu_on1 as [j (wj, IH)].
       eapply ksat_shift; eauto.
-      eapply IHprv2; eauto using good_shift.
-      intros; simpl in H1; destruct H1.
-      rewrite <- H1; eauto.
-      eapply in_map_iff in H1; destruct H1 as [psh (eq, xelA)].
-      rewrite <- eq; erewrite <- ksat_shift; eauto. *)
-    *  admit. (* simpl in IHprv. specialize (IHprv u rho gd Hp); eauto. *)
+      eapply IHprv_intu_on2; eauto using good_shift.
+      intros. simpl in H0; destruct H0.
+      rewrite <- H0; eauto.
+      eapply in_map_iff in H0; destruct H0 as [psh (eq, xelA)].
+      rewrite <- eq; erewrite <- ksat_shift; eauto. 
+    * simpl in IHprv_intu_on. specialize (IHprv_intu_on u rho gd Hp); eauto. 
     * apply Hp; eauto.
-    * split; [eapply IHprv1 | eapply IHprv2]; eauto.
-    * simpl in IHprv. eapply IHprv; eauto.
-    * simpl in IHprv. eapply IHprv; eauto.
-    * left; eapply IHprv; eauto.
-    * right; eapply IHprv; eauto.
-    * admit. (*specialize (IHprv1 u rho gd Hp); simpl in IHprv1; destruct IHprv1 as [IH1 | IH2];
-      [eapply  IHprv2 | eapply IHprv3]; eauto; intros; simpl in H2; destruct H2 as [HH1 | HH2]; try rewrite <- HH1; eauto.  
-    * discriminate. ???? *) 
-    * discriminate. 
-  Admitted.
+    * split; [eapply IHprv_intu_on1 | eapply IHprv_intu_on2]; eauto.
+    * simpl in IHprv_intu_on. eapply IHprv_intu_on; eauto.
+    * simpl in IHprv_intu_on. eapply IHprv_intu_on; eauto.
+    * left; eapply IHprv_intu_on; eauto.
+    * right; eapply IHprv_intu_on; eauto.
+    * specialize (IHprv_intu_on1 u rho gd Hp); simpl in IHprv_intu_on1; destruct IHprv_intu_on1 as [IH1 | IH2];
+      [eapply  IHprv_intu_on2 | eapply IHprv_intu_on3]; eauto; intros; simpl in H0; destruct H0 as [HH1 | HH2]; try rewrite <- HH1; eauto.
+  Qed.  
+    
 
+  Lemma soundness_off {ff : falsity_flag} (A : list (form falsity_off))(phi: (form falsity_off)):
+    ff = falsity_off -> prv_intu_off A phi -> kvalid_ctx A phi.
+  Proof.
+    intros;
+    unfold kvalid_ctx. intros M.
+    induction H0 using prv_ind_intu_falsity_off; simpl; intros u rho gd Hp; intros; 
+    try simpl in IHprv_intu_on.
+    * eapply IHprv_intu_off; eauto using good_mon.
+      simpl; intros. destruct H3; [rewrite <- H3 | eapply ksat_mon]; eauto.
+    * simpl in IHprv_intu_off1; eapply IHprv_intu_off1. 4: eapply  IHprv_intu_off2. 
+      all: eauto using reach_refl.
+    * eapply IHprv_intu_off; eauto using good_mon, good_shift.
+      intros psi [psi' [<- HH]] % in_map_iff. 
+      rewrite ksat_comp; eauto using good_mon, good_shift.
+      eapply ksat_mon; eauto using good_comp.
+    * erewrite ksat_comp; eauto. 
+      erewrite ksat_ext. 
+      eapply (IHprv_intu_off u rho gd Hp u (reach_refl u) (eval rho t)).
+      all: eauto using reach_refl, good_comp, good_eval.
+      intros; unfold ">>"; induction x; simpl; reflexivity. 
+    * exists (@eval _ _  _ (I u) rho t); split.
+      now eapply good_eval.
+      specialize (IHprv_intu_off  u rho);  
+      apply ksat_comp in IHprv_intu_off; eauto.
+      eapply ksat_ext. eapply good_shift; eauto using good_eval.
+      2: eapply IHprv_intu_off. 
+      intros. induction x; cbn; reflexivity.
+    * specialize (IHprv_intu_off1 u rho gd Hp); simpl in IHprv_intu_off1.
+      destruct IHprv_intu_off1 as [j (wj, IH)].
+      eapply ksat_shift; eauto.
+      eapply IHprv_intu_off2; eauto using good_shift.
+      intros. simpl in H0; destruct H0.
+      rewrite <- H0; eauto.
+      eapply in_map_iff in H0; destruct H0 as [psh (eq, xelA)].
+      rewrite <- eq; erewrite <- ksat_shift; eauto. 
+    * apply Hp; eauto.
+    * split; [eapply IHprv_intu_off1 | eapply IHprv_intu_off2]; eauto.
+    * simpl in IHprv_intu_off. eapply IHprv_intu_off; eauto.
+    * simpl in IHprv_intu_off. eapply IHprv_intu_off; eauto.
+    * left; eapply IHprv_intu_off; eauto.
+    * right; eapply IHprv_intu_off; eauto.
+    * specialize (IHprv_intu_off1 u rho gd Hp); simpl in IHprv_intu_off1; destruct IHprv_intu_off1 as [IH1 | IH2];
+      [eapply  IHprv_intu_off2 | eapply IHprv_intu_off3]; eauto; intros; simpl in H0; destruct H0 as [HH1 | HH2]; try rewrite <- HH1; eauto.
+  Qed.
+  
+  Lemma soundness {ff : falsity_flag} :
+    forall (A : list (form ff))(phi: (form ff)), prv_intu A phi -> kvalid_ctx A phi.
+  Proof.
+    intros; unfold prv_intu in H. remember ff as current_ff.
+    induction current_ff.
+    eapply soundness_off; eauto. 
+    eapply soundness_on; eauto.
+  Qed.
+  
 End Soundness.
 
-  Section ExampleKmodel.
+Section ConstantDomain.
+    Context {Σf : funcs_signature} {Σp : preds_signature} {ff : falsity_flag}.
+    Context {domain : Type}.
+    Context {frm : kframe}.
+
+    Print ksat.
+    Locate subst_term.
+
+    (*instead of stating this with "if x is not free in psi", I will state it with "if psi is a colsed formula" 
+
+
+    Lemma k_bounded_eval_t n t (M: kmodel)(u : nodes)(rho sigma: nat -> my_KripkeCompleteness.domain):
+      (forall k, n > k -> rho k = sigma k) -> bounded_t n t -> eval (I u) rho t = eval (I u) sigma t.
+    Proof.
+      intros H. induction 1; cbn; auto.
+      f_equal. now apply Vector.map_ext_in.
+    Qed.
+
+    Lemma ksat_closed (M: kmodel)(u : nodes)(rho sigma: nat -> my_KripkeCompleteness.domain)(psi: form) :
+      closed psi -> good u rho -> good u sigma -> ksat u rho psi <-> ksat u sigma psi.
+    Proof.
+      intros H gdr gds; 
+      induction psi; split; intros.
+      1, 2: simpl in H0. 1, 2: eapply H0.
+      1, 2: simpl in H0. simpl. 1, 2: eapply H0.
+      erewrite ksat_ext.
+      1, 4: erewrite <-ksat_comp.
+      1, 3: erewrite bounded_0_subst.
+      all: eauto using good_shift, good_mon, reach_tran.
+
+      induction psi; eauto; try tauto; rewrite <- bounded_0_subst.
+      * eapply  
+    Qed.
+
+
+    Lemma forall_gen (M: kmodel)(rho: nat -> my_KripkeCompleteness.domain)(phi psi: form):
+        forall u : nodes, closed psi -> good u rho ->
+        ksat u rho (bin Impl (bin Disj (quant All  phi) (psi)) (quant All (bin Disj phi (psi)))).
+    Proof.
+      cbn; intros.
+      destruct H2.
+      + left. eapply H2; eauto.
+      +  right. eapply ksat_ext. eauto using good_shift, good_mon, reach_tran.
+      2: erewrite <-ksat_comp. 
+      2: erewrite bounded_0_subst. 2: eapply ksat_mon. 4: eapply H2.
+      all: eauto using reach_tran, good_mon, H.
+      intros. unfold ">>".
+      Print eval. induction x; simpl. Locate eval.
+      
+      let ρ := up in 1.
+      all:
+      
+      eapply ksat_ext. 3: eapply ksat_mon. 5: eapply H2. 
+        all: eauto using good_shift, good_mon, reach_tran.
+        intros.  
+    Qed.
+    
+
+    Definition constant_domain (M : kmodel) :  Prop :=
+      forall (u v: nodes) (j: my_KripkeCompleteness.domain), world u j <-> world v j.
+
+    Lemma CD_axiom (M: kmodel)(rho: nat -> my_KripkeCompleteness.domain)(phi psi: form):
+        constant_domain M -> forall u : nodes, 
+        ksat u rho (bin Impl (quant All (bin Disj phi (psi[↑]))) (bin Disj (quant All  phi) (psi[↑]))).
+    Proof.
+      intros.
+      + simpl. cbn in *. *)
+    
+
+End ConstantDomain.
+
+Section Example_nonConstantDomain.
 
     Instance Σ_funcs : funcs_signature :=
       {|
@@ -600,41 +724,45 @@ End Soundness.
         ar_syms := fun _ => 0;
       |}.
 
+    Inductive Preds : Type:=
+    | P : Preds
+    | Q : Preds.
+
     Instance Σ_preds : preds_signature :=
       {|
-        preds := unit;
+        preds := Preds;
         ar_preds := fun x => 1;
       |}.
+    
     Instance ff : falsity_flag := falsity_on.
-
 
     Inductive my_domain : Type :=
       | a : my_domain
       | b : my_domain.
 
     Inductive my_nodes : Type :=
-      | v : my_nodes
-      | w : my_nodes.
+      | u : my_nodes
+      | v : my_nodes.
 
     Definition my_reach x y: Prop :=
       match x with 
-      | v => True
-      | w => match y with
-            | w => True
+      | u => True
+      | v => match y with
+            | v => True
             | _ => False
             end
       end.
 
     Definition my_world node t: Prop :=
       match node with 
-      | v => match t with 
+      | u => match t with 
             | a => True
             | b => False
             end
-      | w => True
+      | v => True
     end.
 
-    Program Instance ex_frm : kframe :=
+    Program Instance my_frm : kframe :=
       {|
         domain := my_domain;
         nodes := my_nodes;
@@ -642,56 +770,156 @@ End Soundness.
         world := my_world;
       |}.
     Next Obligation.
-      induction u; simpl; eauto.
+      induction u0; simpl; tauto.
     Qed.
     Next Obligation.
-      induction u; induction v0; induction w0; eauto.
+      induction u0; induction v0; induction w; eauto.
     Qed.
     Next Obligation.
-      induction u; induction v0; induction x; eauto.
+      induction u0; induction v0; induction x; eauto.
     Qed.
       
-    Print t.
-
-    Instance my_I_v : @interp Σ_funcs Σ_preds my_domain :=
-      {| 
-        i_func := fun _ _ => a; 
-        i_atom := fun P x => False
-      |}.
-
-    Instance my_I_w : @interp Σ_funcs Σ_preds my_domain :=
-      {| 
-        i_func := fun _ _ => a; 
-        i_atom := fun P x => match (ar_preds P) with 
-                            | 1 => match x with
-                                  | cons _ b _ _ => True
-                                  | cons _ a _ _ => False
-                                  | _ => False
-                                  end
-                            | _ => False
-                            end |}.
-            
     Print interp.
 
-    Program Instance my_kmodel: @kmodel _ _ ex_frm :=
+     Instance my_I_u : @interp Σ_funcs Σ_preds my_domain :=
+      {| 
+        i_func := fun _ _ => a; 
+        i_atom := fun pr x => match x with
+                              | cons _ a _ (nil _) => match pr with 
+                                                      | P => False
+                                                      | Q => True
+                                                      end
+                              | cons _ b _ (nil _) =>  False
+                              | _ => False
+                              end;
+      |}.
+
+      Instance my_I_v : @interp Σ_funcs Σ_preds my_domain :=
+      {| 
+        i_func := fun _ _ => a; 
+        i_atom := fun pr x => match x with
+                              | cons _ a _ (nil _) => match pr with 
+                                                      | P => False
+                                                      | Q => True
+                                                      end
+                              | cons _ b _ (nil _) =>  match pr with 
+                                                      | P => True
+                                                      | Q => False
+                                                      end
+                              | _ => False
+                              end;
+      |}.
+
+    Lemma in_u:
+    forall x : my_domain, my_world u x -> x = a.
+    Proof.
+      intros. 
+      unfold my_world in H.
+      induction x.
+      reflexivity.
+      eauto.
+    Qed.
+
+    Lemma in_v:
+    forall x : my_domain, my_world v x -> x = a \/ x = b.
+    Proof.
+      intros. 
+      unfold my_world in H.
+      induction x.
+      left; reflexivity.
+      eauto.
+    Qed.
+
+    Lemma In_inv {A: Type}{n: nat} {x: A} {v : t A n} :
+        In x v ->
+        (match n return t A n -> Prop with
+        | 0 => fun _ => False
+        | S n => fun v' => (x = Vector.hd v') \/ (In x (Vector.tl v'))
+        end) v.
+    Proof. 
+    intros []; cbn; tauto. Qed.
+
+    Lemma tail_vec_1 {A: Type} :
+    forall vv: (t A 1), tl vv = nil A.
+    Proof.
+      intros. 
+      dependent destruction vv. cbn. 
+      dependent destruction vv. reflexivity.
+    Qed.
+
+    Lemma vec_in_u':
+    forall vv: (t my_domain 1), forall x : domain, In x vv -> my_world u x ->  
+    hd vv = a.
+    Proof.
+      intros. 
+      erewrite  <- in_u.
+      2: apply H0. eapply In_inv in H. simpl in H. 
+      destruct H. rewrite H; eauto; tauto.
+      apply In_inv in H; simpl in H; auto.
+    Qed.
+
+    Lemma vec_in_u:
+    forall vv: (t my_domain 1), forall x : domain, In x vv -> my_world u x ->  
+    vv = cons my_domain a 0 (nil my_domain).
+    Proof.
+      intros.
+      eapply vec_in_u' in H; eauto.
+      pose proof eta vv.
+      rewrite H1. cbn. f_equal. eapply H.
+      eapply tail_vec_1.
+    Qed.
+
+    Lemma vec_in_v':
+    forall vv: (t my_domain 1), forall x : domain, In x vv -> my_world v x ->  
+    hd vv = a \/ hd vv = b.
+    Proof.
+      intros. 
+      pose proof (in_v H0). 
+      eapply In_inv in H; simpl in H; destruct H;
+      destruct H1; rewrite <- H1; eauto. 
+      all: rewrite tail_vec_1 in H; eapply In_inv in H; simpl in H; eauto.
+    Qed.
+
+    Lemma vec_in_v:
+    forall vv: (t my_domain 1), forall x : domain, In x vv -> my_world v x ->  
+    vv = cons my_domain a 0 (nil my_domain) \/ vv = cons my_domain b 0 (nil my_domain).
+    Proof.
+      intros.
+      eapply vec_in_v' in H; eauto.
+      pose proof eta vv.
+      rewrite H1. destruct H. 
+      left; f_equal. eapply H. eapply tail_vec_1.
+      right; f_equal. eapply H. eapply tail_vec_1.
+    Qed.
+
+    Program Instance my_kmodel: @kmodel _ _ my_frm :=
     {|
-        I := fun (u: nodes) => match u with 
+        I := fun (w: nodes) => match w with 
+                              | u => my_I_u
                               | v => my_I_v
-                              | w => my_I_w 
                               end
       |}.
     Next Obligation.
-      induction u; induction v0; simpl; reflexivity.
+      induction u0; induction v0; simpl; reflexivity.
     Qed.
     Next Obligation.
-      induction u; induction v; simpl; auto.
+      induction u0; simpl; auto.
     Qed.
     Next Obligation.
-      induction u; induction v0; simpl; auto.
-      dependent destruction vv; destruct h; auto.
-    Qed.
+      remember P0 as PP.
+      induction PP; induction u0; induction v0; cbn; eauto; unfold in_dom in a0.
+      all : dependent destruction vv; destruct h.
+      dependent destruction vv.
+      simpl in H; eauto.
+      all : dependent destruction vv. eauto.
+      all: simpl in H; eauto.
     Next Obligation.
-      induction u; induction x; simpl; auto.
+      induction u0; induction v0; induction P0; eauto.
+      simpl in *; destruct vv in H; eauto;
+      destruct h in H; eauto.
+      all: dependent destruction vv; destruct h.
+      dependent destruction vv. 
+
     Qed.
 
 
@@ -699,7 +927,7 @@ End Soundness.
 
 
     
-  End ExampleKmodel.
+  End Example_nonConstantDomain.
 
 
 
