@@ -13,6 +13,21 @@ Require Import Coq.Program.Equality.
 
 Require Import Undecidability.FOL.Semantics.Tarski.FullCore.
 
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (* ** Universal Models *)
 Section VariableDomainKripke.
   Context {Σ_funcs : funcs_signature}.
@@ -123,4 +138,55 @@ Qed.
       | quant Ex phi => exists j: domain, world u j  /\  ksat u (j .: rho) phi
       end.
 
+(*
+instead of stating this with "if x is not free in psi", I will state it with "if psi is a colsed formula" 
 
+
+    Lemma k_bounded_eval_t n t (M: kmodel)(u : nodes)(rho sigma: nat -> my_KripkeCompleteness.domain):
+      (forall k, n > k -> rho k = sigma k) -> bounded_t n t -> eval (I u) rho t = eval (I u) sigma t.
+    Proof.
+      intros H. induction 1; cbn; auto.
+      f_equal. now apply Vector.map_ext_in.
+    Qed.
+
+    Lemma ksat_closed (M: kmodel)(u : nodes)(rho sigma: nat -> my_KripkeCompleteness.domain)(psi: form) :
+      closed psi -> good u rho -> good u sigma -> ksat u rho psi <-> ksat u sigma psi.
+    Proof.
+      intros H gdr gds; 
+      induction psi; split; intros.
+      1, 2: simpl in H0. 1, 2: eapply H0.
+      1, 2: simpl in H0. simpl. 1, 2: eapply H0.
+      erewrite ksat_ext.
+      1, 4: erewrite <-ksat_comp.
+      1, 3: erewrite bounded_0_subst.
+      all: eauto using good_shift, good_mon, reach_tran.
+
+      induction psi; eauto; try tauto; rewrite <- bounded_0_subst.
+      * eapply  
+    Qed.
+
+
+
+    Lemma forall_gen (M: kmodel)(rho: nat -> my_KripkeCompleteness.domain)(phi psi: form):
+        forall u : nodes, closed psi -> good u rho ->
+        ksat u rho (bin Impl (bin Disj (quant All  phi) (psi)) (quant All (bin Disj phi (psi)))).
+    Proof.
+      cbn; intros.
+      destruct H2.
+      + left. eapply H2; eauto.
+      +  right. eapply ksat_ext. eauto using good_shift, good_mon, reach_tran.
+      2: erewrite <-ksat_comp. 
+      2: erewrite bounded_0_subst. 2: eapply ksat_mon. 4: eapply H2.
+      all: eauto using reach_tran, good_mon, H.
+      intros. unfold ">>".
+      Print eval. induction x; simpl. Locate eval.
+      
+      let ρ := up in 1.
+      all:
+      
+      eapply ksat_ext. 3: eapply ksat_mon. 5: eapply H2. 
+        all: eauto using good_shift, good_mon, reach_tran.
+        intros.  
+    Qed.
+    
+*)
