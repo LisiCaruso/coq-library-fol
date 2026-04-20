@@ -326,200 +326,68 @@ Section Soundness.
   Definition ksatis {ff : falsity_flag} phi :=
     exists (M: kmodel) (u: nodes) (rho: nat -> domain), good u rho /\ ksat M u rho phi.
 
-  Definition prv_intu_on := @prv _ _ (falsity_on) intu.
+  
+  Arguments form {_ _ _} __.
 
-  Lemma prv_ind_intu_falsity_on:
-  forall P : peirce -> list (form falsity_on) -> form falsity_on -> Prop,
-    (forall (A : list form) (phi psi : form),
-        prv_intu_on (phi :: A) psi -> P intu (phi :: A) psi -> P intu A (phi → psi)) ->
-    (forall (A : list form) (phi psi : form),
-         prv_intu_on A (phi → psi) -> P intu A (phi → psi) -> prv_intu_on A phi -> P intu A phi -> P intu A psi) ->
-    (forall (A : list form) (phi : form),
-        prv_intu_on (List.map (subst_form ↑) A) phi -> P intu (List.map (subst_form ↑) A) phi -> P intu A (∀ phi)) ->
-    (forall (A : list form) (t : term) (phi : form),
-        prv_intu_on A (∀ phi) -> P intu A (∀ phi) -> P intu A phi[t..]) ->
-    (forall (A : list form) (t : term) (phi : form),
-        prv_intu_on A phi[t..] -> P intu A phi[t..] -> P intu A (∃ phi)) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_on A (∃ phi) ->
-              P intu A (∃ phi) ->
-              prv_intu_on (phi :: [p[↑] | p ∈ A]) (psi[↑]) ->  P intu (phi :: [p[↑] | p ∈ A]) psi[↑] -> P intu A psi) ->
-    (forall (A : list form) (phi : form), prv_intu_on A ⊥ -> P intu A ⊥ -> P intu A phi) ->
-    (forall (A : list form) (phi : form), phi el A -> P intu A phi) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_on A phi -> P intu A phi -> prv_intu_on A psi -> P intu A psi -> P intu A (phi ∧ psi)) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_on A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A phi) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_on A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A psi) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_on A phi -> P intu A phi -> P intu A (phi ∨ psi)) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_on A psi -> P intu A psi -> P intu A (phi ∨ psi)) ->
-    (forall (A : list form) (phi psi theta : form),
-        prv_intu_on A (phi ∨ psi) ->
-        P intu A (phi ∨ psi) ->
-        prv_intu_on (phi :: A) theta ->
-        P intu (phi :: A) theta -> prv_intu_on (psi :: A) theta -> P intu (psi :: A) theta -> P intu A theta) ->
-    forall (l : list form) (f14 : form), prv_intu_on l f14 -> P intu l f14.
+  Lemma prv_ind_intu :
+  forall P : (forall f : falsity_flag, list (form f) -> (form f) -> Prop),
+    (forall (ff : falsity_flag) (A : list (form ff)) (phi psi : form ff),
+        (phi :: A) ⊢I psi -> P ff (phi :: A) psi -> P ff A (phi → psi)) ->
+    (forall (ff : falsity_flag)(A : list (form ff)) (phi psi : form ff),
+        A ⊢I phi → psi -> P ff A (phi → psi) -> A ⊢I phi -> P ff A phi -> P ff A psi) ->
+    (forall (ff : falsity_flag) (A : list (form ff)) (phi : form ff),
+        (List.map (subst_form ↑) A) ⊢I phi -> P ff (List.map (subst_form ↑) A) phi -> P ff A (∀ phi)) ->
+    (forall (ff : falsity_flag) (A : list (form ff)) (t : term) (phi : form ff),
+        A ⊢I ∀ phi -> P ff A (∀ phi) -> P ff A phi[t..]) ->
+    (forall (ff : falsity_flag) (A : list (form ff)) (t : term) (phi : form ff),
+        A ⊢I phi[t..] -> P ff A phi[t..] -> P ff A (∃ phi)) ->
+    (forall (ff : falsity_flag) (A : list (form ff)) (phi psi : form ff),
+        A ⊢I ∃ phi ->
+              P ff A (∃ phi) ->
+              (phi :: [p[↑] | p ∈ A]) ⊢I psi[↑] -> P ff (phi :: [p[↑] | p ∈ A]) psi[↑] -> P ff A psi) ->
+    (forall  (A : list (form falsity_on)) (phi : form falsity_on), A ⊢I ⊥ -> P falsity_on A ⊥ -> P falsity_on A phi) ->
+    (forall (ff : falsity_flag) (A : list (form ff)) (phi : form ff), phi el A -> P ff A phi) ->
+    (forall (ff : falsity_flag) (A : list (form ff)) (phi psi : form ff),
+        A ⊢I phi -> P ff A phi -> A ⊢I psi -> P ff A psi -> P ff A (phi ∧ psi)) ->
+    (forall (ff : falsity_flag) (A : list (form ff)) (phi psi : form ff),
+        A ⊢I phi ∧ psi -> P ff A (phi ∧ psi) -> P ff A phi) ->
+    (forall (ff : falsity_flag) (A : list (form ff)) (phi psi : form ff),
+        A ⊢I phi ∧ psi -> P ff A (phi ∧ psi) -> P ff A psi) ->
+    (forall (ff : falsity_flag) (A : list (form ff)) (phi psi : form ff),
+        A ⊢I phi -> P ff A phi -> P ff A (phi ∨ psi)) ->
+    (forall (ff : falsity_flag) (A : list (form ff)) (phi psi : form ff),
+        A ⊢I psi -> P ff A psi -> P ff A (phi ∨ psi)) ->
+    (forall (ff : falsity_flag) (A : list (form ff)) (phi psi theta : form ff),
+        A ⊢I phi ∨ psi ->
+        P ff A (phi ∨ psi) ->
+        (phi :: A) ⊢I theta ->
+        P ff (phi :: A) theta -> (psi :: A) ⊢I theta -> P ff (psi :: A) theta -> P ff A theta) ->
+    forall (ff: falsity_flag) (l : list (form ff)) (f14 : form ff), l ⊢I f14 -> P ff l f14.
 Proof.
   intros. 
   specialize (@prv_ind _ _ (fun ff => match ff with 
-                                      | falsity_on =>  (fun p => match p with 
-                                                        | intu => P intu 
+                                      | falsity_on  =>  (fun p => match p with 
+                                                        | intu => P _  
                                                         | _ => fun  _ _ => True end)
-                                      | _           => fun  _ _ _=> True end)).  intros H'.
-  apply H' with (ff := falsity_on) (p := intu); clear H'; intros; try destruct ff; try destruct p;
+                                      | falsity_off  => (fun p => match p with 
+                                                        | intu => P falsity_off
+                                                        | _ => fun  _ _ => True end) end)).
+  intros H'; dependent destruction ff; 
+  [apply H' with (ff := falsity_off) (p := intu) | apply H' with (ff := falsity_on) (p := intu)];
+  clear H'; intros; try destruct ff; try destruct p;
   trivial; intuition eauto 2.
 Qed.
 
-Definition prv_intu_off := @prv _ _ (falsity_off) intu.
-
-Lemma prv_ind_intu_falsity_off:
-  forall P : peirce -> list (form falsity_off) -> form falsity_off -> Prop,
-    (forall (A : list (form falsity_off)) (phi psi : form falsity_off),
-        prv_intu_off (phi :: A) psi -> P intu (phi :: A) psi -> P intu A (phi → psi)) ->
-    (forall (A : list form) (phi psi : form),
-         prv_intu_off A (phi → psi) -> P intu A (phi → psi) -> prv_intu_off A phi -> P intu A phi -> P intu A psi) ->
-    (forall (A : list form) (phi : form),
-        prv_intu_off (List.map (subst_form ↑) A) phi -> P intu (List.map (subst_form ↑) A) phi -> P intu A (∀ phi)) ->
-    (forall (A : list form) (t : term) (phi : form),
-        prv_intu_off A (∀ phi) -> P intu A (∀ phi) -> P intu A phi[t..]) ->
-    (forall (A : list form) (t : term) (phi : form),
-        prv_intu_off A phi[t..] -> P intu A phi[t..] -> P intu A (∃ phi)) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_off A (∃ phi) ->
-              P intu A (∃ phi) ->
-              prv_intu_off (phi :: [p[↑] | p ∈ A]) (psi[↑]) ->  P intu (phi :: [p[↑] | p ∈ A]) psi[↑] -> P intu A psi) ->
-    (forall (A : list form) (phi : form), phi el A -> P intu A phi) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_off A phi -> P intu A phi -> prv_intu_off A psi -> P intu A psi -> P intu A (phi ∧ psi)) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_off A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A phi) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_off A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A psi) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_off A phi -> P intu A phi -> P intu A (phi ∨ psi)) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_off A psi -> P intu A psi -> P intu A (phi ∨ psi)) ->
-    (forall (A : list form) (phi psi theta : form),
-        prv_intu_off A (phi ∨ psi) ->
-        P intu A (phi ∨ psi) ->
-        prv_intu_off (phi :: A) theta ->
-        P intu (phi :: A) theta -> prv_intu_off (psi :: A) theta -> P intu (psi :: A) theta -> P intu A theta) ->
-    forall (l : list form) (f14 : form), prv_intu_off l f14 -> P intu l f14.
-Proof.
-  intros. 
-  specialize (@prv_ind _ _ (fun ff => match ff with 
-                                      | falsity_off =>  (fun p => match p with 
-                                                        | intu => P intu 
-                                                        | _ => fun  _ _ => True end)
-                                      | _           => fun  _ _ _=> True end)).  intros H'.
-  apply H' with (ff := falsity_off) (p := intu); clear H'; intros; try destruct ff; try destruct p;
-  trivial; intuition eauto 2.
-Qed.
-
-Definition prv_intu (ff : falsity_flag):= 
-  match ff with 
-  | falsity_on => prv_intu_on
-  | falsity_off => prv_intu_off
-  end.
-
-Lemma prv_intu_ind (ff : falsity_flag):
-  (ff = falsity_off -> (
-  forall P : peirce -> list (form falsity_off) -> form falsity_off -> Prop,
-    (forall (A : list (form falsity_off)) (phi psi : form falsity_off),
-        prv_intu_off (phi :: A) psi -> P intu (phi :: A) psi -> P intu A (phi → psi)) ->
-    (forall (A : list form) (phi psi : form),
-         prv_intu_off A (phi → psi) -> P intu A (phi → psi) -> prv_intu_off A phi -> P intu A phi -> P intu A psi) ->
-    (forall (A : list form) (phi : form),
-        prv_intu_off (List.map (subst_form ↑) A) phi -> P intu (List.map (subst_form ↑) A) phi -> P intu A (∀ phi)) ->
-    (forall (A : list form) (t : term) (phi : form),
-        prv_intu_off A (∀ phi) -> P intu A (∀ phi) -> P intu A phi[t..]) ->
-    (forall (A : list form) (t : term) (phi : form),
-        prv_intu_off A phi[t..] -> P intu A phi[t..] -> P intu A (∃ phi)) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_off A (∃ phi) ->
-              P intu A (∃ phi) ->
-              prv_intu_off (phi :: [p[↑] | p ∈ A]) (psi[↑]) ->  P intu (phi :: [p[↑] | p ∈ A]) psi[↑] -> P intu A psi) ->
-    (forall (A : list form) (phi : form), phi el A -> P intu A phi) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_off A phi -> P intu A phi -> prv_intu_off A psi -> P intu A psi -> P intu A (phi ∧ psi)) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_off A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A phi) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_off A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A psi) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_off A phi -> P intu A phi -> P intu A (phi ∨ psi)) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_off A psi -> P intu A psi -> P intu A (phi ∨ psi)) ->
-    (forall (A : list form) (phi psi theta : form),
-        prv_intu_off A (phi ∨ psi) ->
-        P intu A (phi ∨ psi) ->
-        prv_intu_off (phi :: A) theta ->
-        P intu (phi :: A) theta -> prv_intu_off (psi :: A) theta -> P intu (psi :: A) theta -> P intu A theta) ->
-    forall (l : list form) (f14 : form), prv_intu_off l f14 -> P intu l f14 )) /\
-    (ff = falsity_on -> (forall P : peirce -> list (form falsity_on) -> form falsity_on -> Prop,
-    (forall (A : list form) (phi psi : form),
-        prv_intu_on (phi :: A) psi -> P intu (phi :: A) psi -> P intu A (phi → psi)) ->
-    (forall (A : list form) (phi psi : form),
-         prv_intu_on A (phi → psi) -> P intu A (phi → psi) -> prv_intu_on A phi -> P intu A phi -> P intu A psi) ->
-    (forall (A : list form) (phi : form),
-        prv_intu_on (List.map (subst_form ↑) A) phi -> P intu (List.map (subst_form ↑) A) phi -> P intu A (∀ phi)) ->
-    (forall (A : list form) (t : term) (phi : form),
-        prv_intu_on A (∀ phi) -> P intu A (∀ phi) -> P intu A phi[t..]) ->
-    (forall (A : list form) (t : term) (phi : form),
-        prv_intu_on A phi[t..] -> P intu A phi[t..] -> P intu A (∃ phi)) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_on A (∃ phi) ->
-              P intu A (∃ phi) ->
-              prv_intu_on (phi :: [p[↑] | p ∈ A]) (psi[↑]) ->  P intu (phi :: [p[↑] | p ∈ A]) psi[↑] -> P intu A psi) ->
-    (forall (A : list form) (phi : form), prv_intu_on A ⊥ -> P intu A ⊥ -> P intu A phi) ->
-    (forall (A : list form) (phi : form), phi el A -> P intu A phi) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_on A phi -> P intu A phi -> prv_intu_on A psi -> P intu A psi -> P intu A (phi ∧ psi)) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_on A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A phi) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_on A (phi ∧ psi) -> P intu A (phi ∧ psi) -> P intu A psi) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_on A phi -> P intu A phi -> P intu A (phi ∨ psi)) ->
-    (forall (A : list form) (phi psi : form),
-        prv_intu_on A psi -> P intu A psi -> P intu A (phi ∨ psi)) ->
-    (forall (A : list form) (phi psi theta : form),
-        prv_intu_on A (phi ∨ psi) ->
-        P intu A (phi ∨ psi) ->
-        prv_intu_on (phi :: A) theta ->
-        P intu (phi :: A) theta -> prv_intu_on (psi :: A) theta -> P intu (psi :: A) theta -> P intu A theta) ->
-    forall (l : list form) (f14 : form), prv_intu_on l f14 -> P intu l f14)).
-Proof.
-  split.
-  induction ff. 
-    * intros. 
-      specialize (@prv_ind _ _ (fun ff => match ff with 
-                                        | falsity_off =>  (fun p => match p with 
-                                                          | intu => P intu 
-                                                          | _ => fun  _ _ => True end)
-                                        | _           => fun  _ _ _=> True end));  intros H';
-      apply H' with (ff := falsity_off) (p := intu); clear H'; intros; try destruct ff; try destruct p;
-      trivial; intuition eauto 2.
-    * intros. discriminate H. 
-    * intros.  
-      specialize (@prv_ind _ _ (fun ff => match ff with 
-                                          | falsity_on =>  (fun p => match p with 
-                                                            | intu => P intu 
-                                                            | _ => fun  _ _ => True end)
-                                          | _           => fun  _ _ _=> True end));  intros H';
-      apply H' with (ff := falsity_on) (p := intu); clear H'; intros; try destruct ff0; try destruct p;
-      trivial; intuition eauto 2.
-Qed.
-
-  Lemma soundness_on {ff : falsity_flag} (A : list (form falsity_on))(phi: (form falsity_on)):
-    ff = falsity_on -> prv_intu_on A phi -> kvalid_ctx A phi.
+Arguments prv {_ _ _} _.
+(*
+Lemma soundness {ff : falsity_flag} (A : list (form ff))(phi: (form ff)):
+    prv intu A phi -> kvalid_ctx A phi.
   Proof.
-    intros;
-    unfold kvalid_ctx. intros M.
-    induction H0 using prv_ind_intu_falsity_on; simpl;  intros u rho gd Hp; intros; 
+    unfold kvalid_ctx.
+    intros H M. 
+    induction H using prv_ind_intu.
+
+    simpl;  intros u rho gd Hp; intros; 
     try simpl in IHprv_intu_on.
     * eapply IHprv_intu_on; eauto using good_mon.
       simpl; intros. destruct H3; [rewrite <- H3 | eapply ksat_mon]; eauto.
@@ -614,8 +482,85 @@ Qed.
     eapply soundness_off; eauto. 
     eapply soundness_on; eauto.
   Qed.
-  
+  *)
 End Soundness.  
+
+Section ConstantDomain.
+  Context {Σf : funcs_signature} {Σp : preds_signature}.
+  Context {frm : kframe}.
+  (* Context {M : kmodel}. *) 
+  Definition constant_domain (fr : kframe)(M : kmodel) :  Prop :=
+      (forall (u v: nodes) (j: domain), world u j <-> world v j).
+
+  
+  Definition constant_domain' (fr : kframe)(M : kmodel) :  Prop :=
+      forall (u : nodes) (j: domain), world u j.
+  
+  Definition non_empty (fr : kframe)(M : kmodel) :  Prop :=
+      exists (u : nodes) (j: domain), world u j.
+
+  Definition constant_domain_meta :=
+  forall (X: Type)(A: X -> Prop)(B: Prop),
+    (forall x: X, (A x \/ B)) -> ((forall x: X, A x) \/ B).
+
+  Lemma cdm_distr_impl_or :
+  constant_domain_meta -> (forall (a b c: Prop), (a -> (b \/ c)) -> ((a -> b) \/ c)).
+  Proof.
+    intros. 
+    eapply H. eauto.
+  Qed.
+(*
+  Lemma CD_exist (fr : kframe)(M: kmodel)(u : nodes) (rho: nat -> domain) (phi: form): 
+    constant_domain M -> (ksat u rho (quant All phi) <-> forall (j: domain), (exists (v: nodes), world v j) -> (j .: rho) ⊩( u, M) phi).
+  Proof.
+    split; intros.
+    + destruct H1. eapply H0. eapply reach_refl. eapply H; eauto. 
+    + cbn. intros. specialize (H0 j). eapply ksat_mon; eauto. unfold good. intros. eapply H. 
+  Qed.
+
+  Lemma CD_forall (fr : kframe) (M: kmodel)(u: nodes) (rho: nat -> domain) (phi: form): 
+    constant_domain M -> (ksat u rho (quant Ex phi) <-> exists (j: domain), (j .: rho) ⊩( u, M) phi).
+  Proof.
+    split; intros.
+    + simpl in H0; repeat destruct H0. exists x.
+      eapply H1. 
+    + cbn. destruct H0. exists x. split.
+      eapply H. eapply H0.
+  Qed.
+  *)
+
+(* rho ⊩( u, M) ((∀ phi ∨ psi [↑]) → (∀ phi) ∨ psi [↑])*)
+  Lemma CD_imp_CD_axiom_ (M: kmodel)(rho: nat -> my_KripkeCompleteness.domain)(phi psi: form):
+        non_empty M-> constant_domain M -> constant_domain_meta -> 
+        forall (u : nodes), good u rho ->
+        ksat u rho (bin Impl (quant All (bin Disj phi (psi[↑]))) (bin Disj (quant All  phi) (psi))).
+    Proof.
+    simpl.
+    intros.
+    unfold constant_domain_meta in H1.
+    eapply H1; intros.
+    eapply cdm_distr_impl_or; eauto; intros.
+    eapply H1; intros.
+    eapply cdm_distr_impl_or; eauto; intros.
+    pose proof (H4 x H5 x0 H6).
+    assert (world v x0).
+    eapply H0; eauto.
+    assert ((world v x0 -> (x0 .: rho) ⊩( v, M) phi) \/ (x0 .: rho) ⊩( v, M) psi [↑]).
+    eapply H1; eapply H4; eapply reach_refl.
+    destruct H9.
+    left. eapply ksat_iff; eauto using good_shift, good_mon.
+    left; eauto.
+    right. erewrite <- ksat_shift in H7; eauto using good_mon.
+    
+    pose proof (H4 H8).
+    eapply (cdm_distr_impl_or H1) in H4.
+        
+    Admitted.
+
+     Definition CDA_meta (fr : kframe)(M : kmodel) :  Prop :=
+    forall j : domain, (j .: rho) ⊩( v, M) phi \/ (j .: rho) ⊩( v, M) psi [↑]
+
+End ConstantDomain.
 
 Section Example_nonConstantDomain.
 
@@ -680,7 +625,7 @@ Section Example_nonConstantDomain.
       induction u0; induction v0; induction x; eauto.
     Qed.
 
-     Instance my_I_u : @interp Σ_funcs Σ_preds my_domain :=
+    Instance my_I_u : @interp Σ_funcs Σ_preds my_domain :=
       {| 
         i_func := fun _ _ => a; 
         i_atom := fun pr x => match x with
@@ -829,8 +774,7 @@ Section Example_nonConstantDomain.
       apply In_inv in H0; simpl in H0; eauto.
     Qed.
 
-
-
+      End Example_nonConstantDomain.
   Definition A (alpha: t term 1): form :=  atom Q alpha.
   Definition B (alpha: t term 1): form := quant Ex (atom P alpha).
 
@@ -893,56 +837,6 @@ Section Example_nonConstantDomain.
   Qed.
 
 
-  Definition constant_domain (fr : kframe)(M : kmodel) :  Prop :=
-      (forall (u: nodes) (j: my_KripkeCompleteness.domain), world u j).
-
-  Lemma CD_exist (fr : kframe)(M: kmodel)(u: nodes) (rho: nat -> my_KripkeCompleteness.domain) (phi: form): 
-    constant_domain M -> (ksat u rho (quant All phi) <-> forall (j: my_KripkeCompleteness.domain), (j .: rho) ⊩( u, M) phi).
-  Proof.
-    split; intros.
-    + eapply H0. eapply reach_refl. eapply H.
-    + cbn. intros. eapply ksat_mon; eauto. unfold good. intros. eapply H.
-  Qed.
-
-  Lemma CD_forall (fr : kframe) (M: kmodel)(u: nodes) (rho: nat -> my_KripkeCompleteness.domain) (phi: form): 
-    constant_domain M -> (ksat u rho (quant Ex phi) <-> exists (j: my_KripkeCompleteness.domain), (j .: rho) ⊩( u, M) phi).
-  Proof.
-    split; intros.
-    + simpl in H0; repeat destruct H0. exists x.
-      eapply H1. 
-    + cbn. destruct H0. exists x. split.
-      eapply H. eapply H0.
-  Qed.
-
-  Lemma CD_axiom (M: kmodel)(rho: nat -> my_KripkeCompleteness.domain)(phi psi: form):
-        constant_domain M <-> forall u : nodes, 
-        ksat u rho (bin Impl (quant All (bin Disj phi (psi[↑]))) (bin Disj (quant All  phi) (psi[↑]))).
-    Proof.
-      split.
-      intros.
-      unfold constant_domain in H.
-      + cbn in *; intros.
-        pose proof (H1 v0 (reach_refl v0)).
-        eapply H1 in H.
-        2: eapply reach_refl.
-        destruct H.
-        eapply H.
-        left. intros. 
-        assert (forall j : my_domain, (my_world v0 j -> (j .: rho) ⊩( v0, M) phi) \/ 
-        (my_world v0 j -> (j .: rho) ⊩( v0, M) psi [↑])).
-        intros. 
-        pose proof (H4 j).
-        assert (my_world v0 j -> ((j .: rho) ⊩( v0, M) phi) \/ 
-        ((j .: rho) ⊩( v0, M) psi [↑])).
-        intros.
-        pose proof (H5 H6); eauto.*)
-      + intros. unfold constant_domain. intros. cbn in H.
-        pose proof (H u0 v0).
-        
-    Admitted.
-        
-        
-
   End Example_nonConstantDomain.
 
 
@@ -993,6 +887,7 @@ Section Bottom.
         reachable := @incl form ;
         world := fun u t => True; (* this is wrong, I don't know what to put here*)
       |}.
+ Qed.
 
   Program Instance K_ctx {ff: falsity_flag}: @kmodel _ _ K_frm_ctx:=
     {|
@@ -1065,487 +960,4 @@ Print FullSyntax.full_operators.
 
 End Bottom.
 
-Arguments ksat_bot {_} {_} {_} {_} {_} _ _ _ _.
-
-Section BottomDef.
-
-  Context {Σ_funcs : funcs_signature}.
-  Context {Σ_preds : preds_signature}.
-
-  Context {ff : falsity_flag}.
-
-  Definition kexploding D (M : kmodel D) F_P mon_F := forall v rho phi, ksat_bot F_P mon_F v rho (⊥ → phi).
-  Arguments kexploding _ _ _ _ : clear implicits.
-
-  Definition kvalid_exploding_ctx A phi :=
-    forall D (M : kmodel D) F_P mon_F u rho, kexploding D M F_P mon_F -> (forall psi, psi el A -> ksat_bot F_P mon_F u rho psi) -> ksat_bot F_P mon_F u rho phi.
-
-  Definition kvalid_exploding phi :=
-    forall D (M : kmodel D) F_P mon_F u rho, kexploding D M F_P mon_F -> ksat_bot F_P mon_F u rho phi.
-
-  Definition ksatis_exploding phi :=
-    exists D (M : kmodel D) F_P mon_F u rho, kexploding D M F_P mon_F /\ ksat_bot F_P mon_F u rho phi.
-
-End BottomDef.
-
-  Section Contexts.
-
-    
-
-    Program Instance K_ctx {ff:falsity_flag} : kmodel :=
-      {|
-        nodes := list form ;
-        reachable := @incl form ;
-        k_interp := model_bot ;
-        k_P := fun A P v => fprv A (atom P v) ; (*took away a "NONE"*)
-      |}.
-    Next Obligation.
-      (* abstract (eauto using seq_Weak). *)
-      abstract (eauto using weaken).
-    Qed.
-
-    Definition F_P {ff} : list (@form _ _ _ ff) -> Prop := match ff with falsity_on => fun n => fprv n ⊥ | _ => fun _ => False end.
-    Lemma mon_F {ff:falsity_flag} (u v : @nodes K_ctx) : reachable u v -> F_P u -> F_P v. (*BEFORE (u v : @nodes _  _ K_ctx)*)
-    Proof.
-      cbn. unfold F_P. destruct ff; try easy. intros H H1. eapply weaken; [ exact H1| exact H]. intros. eapply weaken. apply H0. apply H.
-    Qed.
-
-    Notation "rho '⊩⊥(' u , M ')' phi" :=  (@    _ _ _ M _ F_P mon_F u rho phi) (at level 20).
-
-    Lemma K_ctx_correct_exp {ff:falsity_flag} (A : list form) rho phi :
-      (rho ⊩⊥(A, K_ctx ) phi-> A ⊢S phi[rho]) /\
-      ((forall B psi, A <<= B -> B ;; phi[rho] ⊢s psi -> B ⊢S psi) -> rho ⊩⊥(A, K_ctx) phi).
-    Proof.
-      revert A rho.
-       enough ((forall A rho, rho ⊩⊥( A, K_ctx) phi -> A ⊢S phi[rho]) /\
-                          (forall A rho, (forall B psi, A <<= B -> B;; phi[rho] ⊢s psi -> B ⊢S psi)
-                                  -> rho ⊩⊥( A, K_ctx) phi)) by intuition.
-      (*                         
-      induction phi as [|t1 t2|ff [] phi IHphi psi IHpsi|ff [] phi IHphi]; cbn; split; intros A rho.
-      - tauto.
-      - eauto.
-      - erewrite Vector.map_ext. 1: eauto. apply universal_interp_eval.
-      - intros H. erewrite Vector.map_ext. 1: now apply H. apply universal_interp_eval.
-      - intros Hsat. apply IR, IHpsi. apply Hsat, IHphi. 1: intuition. eauto.
-      - intros H B HB Hphi % IHphi. apply IHpsi. intros C xi HC Hxi. apply H.
-        1: now transitivity B. eauto using seq_Weak.
-      - intros Hsat. apply AllR.
-        pose (phi' := phi[up rho]).
-        destruct (find_bounded_L (phi' :: A)).
-        eapply seq_nameless_equiv_all' with (n := x) (phi := phi').
-        + intros xi Hxi. apply b. now right.
-        + eapply bounded_up. 1: apply b; now left. lia.
-        + unfold phi'. asimpl. apply IHphi, Hsat.
-      - intros H t. apply IHphi. intros B psi HB Hpsi. apply H. assumption.
-        apply AllL with (t := t). now asimpl.
-      *)
-      induction phi as [|t1 t2|ff [] phi IHphi psi IHpsi|ff [] phi IHphi].
-      - cbn. split.
-        + intros A rho. 
-          tauto.
-        + intros A rho.
-          intros. eapply H.  reflexivity. apply Ax. (*AAAA non so bene cosa faccia qui*)
-      - cbn. split.
-        + intros A rho H. erewrite Vector.map_ext. 1 : exact H. apply universal_interp_eval.
-        + intros A rho H. erewrite Vector.map_ext. now apply H. apply universal_interp_eval.
-      - cbn. split.
-        + intros A rho H. apply IR. eapply IHpsi. eapply H. 1: auto. 
-        eapply IHphi. intros. simple eapply @Contr. exact H1. apply H0. simpl. left. reflexivity.
-        + intros A rho H B HB Hphi %IHphi. apply IHpsi. intros C xi HC Hxi. apply H. 
-          now transitivity B. apply IL. eapply seq_Weak. exact Hphi. apply HC. apply Hxi.
-      - cbn. split.
-        + intros A rho H. apply AllR.  (*AAAA non so esattamente cosa succede qui*)
-          pose (phi' := phi[up rho]).
-          destruct (find_bounded_L (phi' :: A)).
-          eapply seq_nameless_equiv_all' with (n := x) (phi := phi').
-          -- unfold bounded_L. intros xi Hxi. apply b. now right.
-          -- eapply bounded_up. apply b. now left. auto.
-          -- unfold phi'. asimpl. eapply IHphi. apply H.
-        + intros A rho H t. eapply IHphi. intros B psi HB Hpsi. 
-          apply H. apply HB. eapply AllL with (t:=t). asimpl. apply Hpsi. 
-    Qed.
-
-    Corollary K_ctx_sprv_exp {ff:falsity_flag} A rho phi :
-      rho ⊩⊥(A, K_ctx) phi -> A ⊢S phi[rho].
-    Proof.
-      now destruct (K_ctx_correct_exp A rho phi).
-    Qed.
-
-    Lemma K_ctx_subst_exp {ff:falsity_flag} A phi rho :
-      rho ⊩⊥( A, K_ctx) phi <-> var ⊩⊥( A, K_ctx) phi[rho].  (*AAAA cos'è qui var? var is the identity substitution from numbers to terms*)
-    Proof.
-    
-      unfold ksat_bot, falsity_to_pred.
-      rewrite <- atom_subst_comp. 2:easy.
-      assert (forall {ff:falsity_flag} rho, (atom (Σ_preds := Σ_preds_bot) (inl tt) (Vector.nil _)) = (atom (Σ_preds := Σ_preds_bot) (inl tt) (Vector.nil _))[rho]) as Heq by easy.
-      erewrite Heq.
-      rewrite <- subst_falsity_comm. cbn.
-      rewrite (ksat_comp A var rho).
-      apply ksat_ext. intros x. unfold funcomp. induction (rho x); cbn; try easy.
-      erewrite <- Vector.map_ext_in. 2: apply IH.
-      now rewrite Vector.map_id.
-
-    Qed.
-
-    Lemma K_ctx_constraint_exp {ff:falsity_flag} A rho psi:
-      rho ⊩⊥(A, K_ctx) (⊥ → psi).
-    Proof.
-      destruct ff eqn : Hff; try now intros.
-      intros v B HB. cbn in HB. apply K_ctx_correct_exp.
-      intros B' psi' HB' Hprv. subst. eauto using seq_Weak.
-    Qed.
-
-    Corollary K_ctx_ksat_exp {ff:falsity_flag} A rho phi :
-      (forall B psi, A <<= B -> B ;; phi[rho] ⊢s psi -> B ⊢S psi) -> rho ⊩⊥(A, K_ctx) phi.
-    Proof.
-      now destruct (K_ctx_correct_exp A rho phi).
-    Qed.
- 
-    #[local] Existing Instance falsity_off. 
-
-    Lemma K_ctx_correct (A : list form) rho phi :
-      (rho ⊩(A, K_ctx ) phi-> A ⊢S phi[rho]) /\
-      ((forall B psi, A <<= B -> B ;; phi[rho] ⊢s psi -> B ⊢S psi) -> rho ⊩(A, K_ctx) phi).
-    Proof.
-      revert phi. remember falsity_off as ff eqn:Heqff. intros phi.
-      revert A rho; enough ((forall A rho, rho ⊩( A, K_ctx) phi -> A ⊢S phi[rho]) /\
-                          (forall A rho, (forall B psi, A <<= B -> B;; phi[rho] ⊢s psi -> B ⊢S psi)
-                                  -> rho ⊩( A, K_ctx) phi)) by intuition.
-      induction phi as [|t1 t2|ff [] phi IHphi psi IHpsi|ff [] phi IHphi]; cbn; split; intros A rho.
-      - tauto.
-      - congruence.
-      - erewrite Vector.map_ext. 1: eauto. apply universal_interp_eval.
-      - intros H. erewrite Vector.map_ext. 1: now apply H. apply universal_interp_eval.
-      - intros Hsat. apply IR, IHpsi. 1:easy. apply Hsat, IHphi. 1: intuition. 1:easy. eauto.
-      - intros H B HB Hphi % IHphi. 2:easy. apply IHpsi. 1:easy. intros C xi HC Hxi. apply H.
-        1: now transitivity B. eauto using seq_Weak.
-      - intros Hsat. apply AllR.
-        pose (phi' := phi[up rho]).
-        destruct (find_bounded_L (phi' :: A)).
-        eapply seq_nameless_equiv_all' with (n := x) (phi := phi').
-        + intros xi Hxi. apply b. now right.
-        + eapply bounded_up. 1: apply b; now left. lia.
-        + unfold phi'. asimpl. apply IHphi, Hsat. easy.
-      - intros H t. apply IHphi. 1:easy. intros B psi HB Hpsi. apply H. assumption.
-        apply AllL with (t := t). now asimpl.
-    Qed.
-
-    Corollary K_ctx_sprv A rho phi :
-      rho ⊩(A, K_ctx) phi -> A ⊢S phi[rho].
-    Proof.
-      now destruct (K_ctx_correct A rho phi).
-    Qed.
-
-    Lemma K_ctx_subst A phi rho :
-      rho ⊩( A, K_ctx) phi <-> var ⊩( A, K_ctx) phi[rho].
-    Proof.
-      rewrite (ksat_comp A var rho).
-      apply ksat_ext. intros x. unfold funcomp. induction (rho x); cbn; try easy.
-      erewrite <- Vector.map_ext_in. 2: apply IH.
-      now rewrite Vector.map_id.
-    Qed.
-
-    Corollary K_ctx_ksat A rho phi :
-      (forall B psi, A <<= B -> B ;; phi[rho] ⊢s psi -> B ⊢S psi) -> rho ⊩(A, K_ctx) phi.
-    Proof.
-      now destruct (K_ctx_correct A rho phi).
-    Qed.
-  End Contexts.
-
-  Section ExplodingCompleteness.
-
-    Lemma K_ctx_exploding {ff:falsity_flag}:
-      kexploding mon_F.
-    Proof.
-      unfold kexploding.
-      apply K_ctx_constraint_exp.
-    Qed.
-
-    Lemma K_exp_completeness A phi :
-      kvalid_exploding_ctx A phi -> A ⊢SE phi.
-    Proof.
-      intros Hsat. erewrite <-subst_id. 1: apply K_ctx_sprv_exp with (rho := var). 2: reflexivity.
-      apply Hsat. 1: apply K_ctx_exploding. intros psi Hpsi. apply K_ctx_ksat_exp. intros B xi HB Hxi.
-      rewrite subst_id in Hxi. 2:reflexivity. eauto.
-    Qed.
-
-    Ltac clean_ksoundness :=
-      match goal with
-      | [ H : ?x = ?x -> _ |- _ ] => specialize (H eq_refl)
-      | [ H : (?A -> ?B), H2 : (?A -> ?B) -> _ |- _] => specialize (H2 H)
-      end.
-    Lemma K_exp_ksoundness {ff:falsity_flag} A phi :
-      A ⊢I phi -> kvalid_exploding_ctx A phi.
-    Proof.
-      intros Hprv. cbn in Hprv. intros D M F_P mon_F u rho Hexpl. revert u rho.
-      remember intu as s in Hprv. induction Hprv; subst; cbn; intros u rho HA.
-      all: repeat (clean_ksoundness + discriminate). all: (eauto || cbn ; eauto).
-      - intros v Hr Hpi. eapply IHHprv. intros ? []; subst; eauto using ksat_mon. eapply ksat_mon. 2: now apply HA. easy.
-      - eapply IHHprv1. 3: eapply IHHprv2. all: eauto. apply M.
-      - intros d. apply IHHprv. intros psi [psi' [<- Hp]] % in_map_iff. cbn.
-        unfold ksat_bot. rewrite falsity_to_pred_subst.
-        rewrite ksat_comp. apply HA, Hp.
-      - unfold ksat_bot. rewrite falsity_to_pred_subst.
-        rewrite ksat_comp. eapply ksat_ext. 2: eapply (IHHprv u rho HA (eval rho t)). 
-        unfold funcomp. now intros [].
-      - apply (Hexpl u rho phi u (ltac:(apply M))).
-        specialize (IHHprv u rho HA). cbn in IHHprv. apply IHHprv.
-    Qed.
-
-    Lemma K_exp_seq_ksoundness {ff:falsity_flag} A phi :
-      A ⊢SE phi -> kvalid_exploding_ctx A phi.
-    Proof.
-      intros H%seq_ND. now apply K_exp_ksoundness.
-    Qed.
-
-    Fact SE_cut A phi psi :
-      A ⊢SE phi -> A;;phi ⊢sE psi -> A ⊢SE psi.
-    Proof.
-      intros H1 % seq_ND H2 % seq_ND; cbn in *.
-      apply H2 in H1. apply K_exp_completeness.
-      apply K_exp_ksoundness. firstorder.
-    Qed.
-    
-  End ExplodingCompleteness.
-
-  Section BottomlessCompleteness.
-    #[local] Existing Instance falsity_off.
-
-    Lemma K_bottomless_completeness A phi :
-      kvalid_ctx A phi -> A ⊢S phi.
-    Proof.
-      intros Hsat. erewrite <- subst_id. apply K_ctx_sprv with (rho := var). 2: reflexivity.
-      apply Hsat. intros psi Hpsi. apply K_ctx_ksat. intros B xi HB Hxi.
-      rewrite subst_id in Hxi. 2:easy. eauto.
-    Qed.
-  End BottomlessCompleteness.
-
-(* *** Standard Models *)
-
-  Section StandardCompleteness.
-    #[local] Existing Instance falsity_on.
-
-    Definition cons A := ~ A ⊢SE ⊥.
-    Definition cons_ctx := { A | cons A }.
-    Definition ctx_incl (A B : cons_ctx) := incl (proj1_sig A) (proj1_sig B).
-
-    #[local] Hint Unfold cons cons_ctx ctx_incl : core.
-
-    Notation "A <<=C B" := (ctx_incl A B) (at level 20).
-    Notation "A ⊢SC phi" := ((proj1_sig A) ⊢SE phi) (at level 20).
-    Notation "A ;; psi ⊢sC phi" := ((proj1_sig A) ;; psi ⊢sE phi) (at level 70).
-
-    Ltac dest_con_ctx :=
-      match goal with
-      | [ |- forall u : cons_ctx, _] => let Hu := fresh "H" u in intros [u Hu]
-      | [ A : cons_ctx |- _] => let HA := fresh "H" A in destruct A as [A HA]
-      end.
-
-    Ltac cctx := repeat (progress dest_con_ctx; unfold ctx_incl); cbn.
-
-    Hint Extern 1 => cctx : core.
-
-    Program Instance K_std : kmodel term :=
-      {|
-        reachable := ctx_incl ;
-        k_interp := model_bot ;
-        k_P := fun A P v => ~ ~ A ⊢SC (@atom _ _ _ _ P v) 
-      |}.
-    Next Obligation.
-      abstract (apply H0; intros K; apply H1; eapply seq_Weak; eauto).
-    Qed.
-
-    Lemma K_std_correct (A : cons_ctx) rho phi :
-      (rho ⊩(A, K_std) phi -> ~ ~ A ⊢SC phi[rho]) /\
-      ((forall B psi, A <<=C B -> B ;; phi[rho] ⊢sC psi -> ~ ~ B ⊢SC psi) -> rho ⊩(A, K_std) phi).
-    Proof.
-      revert A rho; enough ((forall A rho, rho ⊩( A, K_std) phi -> ~ ~ A ⊢SC phi[rho])
-                          /\ (forall A rho, (forall B psi, A <<=C B -> B;; phi[rho] ⊢sC psi -> ~ ~ B ⊢SC psi)
-                                    -> rho ⊩( A, K_std) phi)) by firstorder.
-      induction phi as [| t1 t2 | [ ] phi [IHphi1 IHphi2] psi [IHpsi1 IHpsi2] | [ ] phi [IHphi1 IHphi2] ] using form_ind_falsity.
-      all: cbn; split; intros A rho.
-      - tauto.
-      - intros H. exfalso. apply (H A ⊥); auto.
-      - now rewrite (Vector.map_ext _ _ _ _ (universal_interp_eval rho)).
-      - rewrite <- (Vector.map_ext _ _ _ _ (universal_interp_eval rho)). intros H H'.
-        eapply H. 3: { intros H1. apply H', H1. } all: auto.
-      - intros Hsat H.
-        assert (HA : ~ ~ ((phi[rho] :: proj1_sig A) ⊢SE ⊥ \/ ~ (phi[rho] :: proj1_sig A) ⊢SE ⊥)) by tauto.
-        apply HA. clear HA. intros [HA|HA].
-        + apply H. apply IR. apply Absurd. assumption.
-        + pose (A' := exist cons (phi[rho] :: proj1_sig A) HA). apply (IHpsi1 A' rho).
-          * apply Hsat. 1: now apply incl_tl. apply IHphi2. intros B theta HB HT.
-            intros H'. apply H'. eauto.
-          * intros H'. apply H. apply IR, H'.
-      - intros H B HB Hphi % IHphi1. apply IHpsi2. intros C xi HC Hxi.
-        intros HX. apply Hphi. intros Hphi'. apply (H C xi); trivial.
-        + cctx. now transitivity B.
-        + apply IL; trivial. eapply seq_Weak; eauto.
-      - pose (phi' := subst_form ($0 .: (rho >> subst_term (S >> var))) phi).
-        intros Hsat. intros H. cctx. destruct (find_bounded_L (phi' :: A)) as [x b].
-        apply (IHphi1 (exist cons A HA) ($x.:rho)).
-        rewrite ksat_ext. 2: reflexivity. now apply Hsat.
-        intros H'. apply H, AllR. cbn.
-        eapply seq_nameless_equiv_all' with (n := x) (phi := phi').
-        + intros xi Hxi. apply b. now right.
-        + eapply bounded_up. 1: apply b; now left. lia.
-        + unfold phi'. cbn in H'. now asimpl.
-      - intros H t. apply IHphi2. intros B psi HB Hpsi. apply H. assumption.
-        apply AllL with (t := t). now asimpl.
-    Qed.
-
-    Corollary K_std_sprv A rho phi :
-      rho ⊩(A, K_std) phi -> ~ ~ A ⊢SC phi[rho].
-    Proof.
-      now destruct (K_std_correct A rho phi).
-    Qed.
-
-    Corollary K_std_sprv' A rho phi :
-       ~ ~ A ⊢SC phi[rho] -> rho ⊩(A, K_std) phi.
-    Proof.
-      intros H. apply (K_std_correct A rho phi).
-      intros B psi H1 H2 H3. apply H. intros H'.
-      apply H3. eapply SE_cut; try eassumption.
-      now apply (seq_Weak H').
-    Qed.
-
-    Corollary K_std_ksat A rho phi :
-      (forall B psi, A <<=C B -> B ;; phi[rho] ⊢sC psi -> ~ ~ B ⊢SC psi) -> rho ⊩(A, K_std) phi.
-    Proof.
-      now destruct (K_std_correct A rho phi).
-    Qed.
-
-    Lemma K_std_completeness A phi :
-      kvalid_ctx A phi -> ~ ~ A ⊢SE phi.
-    Proof.
-      intros Hsat H.
-      assert (HA : ~ ~ (A ⊢SE ⊥ \/ ~ A ⊢SE ⊥)) by tauto.
-      apply HA. clear HA. intros [HA|HA].
-      - apply H. apply Absurd. assumption.
-      - specialize (Hsat _ K_std (exist cons A HA) var).
-        apply K_std_sprv in Hsat.
-        + apply Hsat. intros Hsat'. apply H.
-          erewrite <- subst_id; trivial. apply Hsat'.
-        + intros psi Hpsi. apply K_std_ksat.
-          intros B xi HB Hxi. asimpl in Hxi. eauto.
-    Qed.
-
-    Lemma K_std_seq_ksoundness A phi :
-      A ⊢SE phi -> kvalid_ctx A phi.
-    Proof.
-      intros H % seq_ND. apply ksoundness, H.
-    Qed.
-  End StandardCompleteness.
-
-
-  Section Stability.
-    Existing Instance falsity_on.
-    Context (T_kind : theory -> Prop).
-    Definition K_completeness := forall T phi, T_kind T -> closed_T T -> closed phi -> 
-                  kvalid_theo T phi -> T ⊩SE phi.
-    Lemma kcompleteness_implies_stability T phi : K_completeness ->
-      T_kind (tmap negative_translation T) ->
-      closed_T T -> closed phi ->
-      ~ ~ T ⊢TC phi -> T ⊢TC phi.
-    Proof.
-      intros Hcomp kindT clT clphi HTDN.
-      apply DN_T. apply nt_correct_theory. cbn. apply seq_ND_T.
-      apply Hcomp.
-      - easy.
-      - apply tmap_closed. 1: apply nt_bounded. easy.
-      - unfold closed. solve_bounds. apply nt_bounded. apply clphi.
-      - intros D M u rho HT.
-        intros v Huv Hphiv. cbn. apply HTDN.
-        intros (A & HTA & HTphi). eapply nt_Cprv_to_Iprv in HTphi.
-        eapply DN_into in HTphi.
-        apply ksoundness in HTphi.
-        unshelve eapply (@HTphi D M u rho _ v Huv Hphiv).
-        intros ? (psi & <- & HApsi) %in_map_iff. apply HT.
-        exists psi. split; try easy. now apply HTA.
-    Qed.
-  End Stability.
-
-  Section MP_Equivalence.
-    Definition kcompleteness_enumerable := K_completeness enumerable.
-
-    Lemma bot_deriv_stable_enum_k (T : @theory _ _ _ falsity_on) : kcompleteness_enumerable -> closed_T T -> enumerable T ->
-      stable (@FragmentND.tprv _ _ _ class T ⊥).
-    Proof.
-      intros Hcomp Hclosed Henum HC.
-      apply (kcompleteness_implies_stability Hcomp); try easy. 2: econstructor.
-      now apply enum_tmap.
-    Qed.
-
-(*
-    Lemma MP_implies_kcompleteness_enum : MP -> kcompleteness_enumerable.
-    Proof.
-      intros Hmp T phi HT Hphi Henum Hvalid.
-      apply completeness_classical_stability; eauto. unfold stable.
-      eapply mp_tprv_stability; try tauto. now eapply enumerable_list_enumerable.
-    Qed.
-*)
-    Lemma kcompleteness_enum_implies_MP : kcompleteness_enumerable -> MP.
-    Proof.
-      intros HC f Hf.
-      pose (fun x : form => exists n, x = ⊥ /\ f n = true) as T.
-      assert (closed_T T) as Hclosed by (now intros k [n [-> Hn]]; econstructor).
-      assert (enumerable T) as Henum.
-      { exists (fun n => if f n then Some (⊥) else None). intros phi; split; intros H.
-        + destruct H as (n & Heq & Hfn). exists n. rewrite Hfn. now rewrite Heq.
-        + destruct H as (n & Hn). unfold T. exists n. destruct (f n); try congruence.
-          split; try easy. congruence.
-       }
-      pose proof (@bot_deriv_stable_enum_k T HC Hclosed Henum).
-      enough (T ⊢TC ⊥) as [[|lx lr] [HL HL']].
-      - exfalso. eapply consistent_ND. apply HL'.
-      - destruct (HL lx) as (n & Heq & Hfn). 1:now left. now exists n.
-      - apply H. intros Hc. apply Hf. intros [n Hn]. apply Hc. exists [⊥]. split.
-        + intros ? [<- | []]. unfold T. exists n. split; try easy.
-        + apply Ctx; now left.
-    Qed.
-
-  End MP_Equivalence.
-
-  Section LEM_Equivalence.
-    Definition kcompleteness_arbitrary := K_completeness (fun x => True).
-    Definition LEM := forall (P:Prop), P \/ ~ P.
-
-    Lemma bot_valid_stable (T : @theory _ _ _ falsity_on) : closed_T T -> stable (valid_theory_C (classical (ff := falsity_on)) T ⊥).
-    Proof.
-      intros Hclosed HH D I rho Hclass H.
-      apply HH. intros Hc. apply (Hc D I rho Hclass H).
-    Qed.
-    Lemma bot_deriv_stable_k (T : @theory _ _ _ falsity_on) : kcompleteness_arbitrary -> 
-      closed_T T -> stable (@FragmentND.tprv _ _ _ class T ⊥).
-    Proof.
-      intros Hcomp Hclosed HC.
-      apply (kcompleteness_implies_stability Hcomp); try easy. econstructor.
-    Qed.
-    Existing Instance falsity_on.
-    Lemma kcompleteness_implies_LEM : kcompleteness_arbitrary -> LEM.
-    Proof.
-      intros HC P.
-      pose (fun x : form => closed x /\ (P \/ ~P)) as T.
-      assert (closed_T T) as Hclosed by (intros k; cbv; tauto).
-      pose proof (@bot_deriv_stable_k T HC Hclosed).
-      enough (T ⊢TC ⊥) as [[|lx lr] [HL HL']].
-      - exfalso. eapply consistent_ND. apply HL'.
-      - eapply HL. now left.
-      - enough (~~ (P \/ ~P)).
-        + apply H. intros Hc. apply H0. intros Hc2. apply Hc. exists [⊥]. split; try (apply Ctx; now left).
-          intros ? [<- | []]. cbv. split; try apply Hc2. econstructor.
-        + tauto.
-    Qed.
-(*
-    Lemma LEM_implies_kcompleteness : LEM -> kcompleteness_arbitrary.
-    Proof.
-      intros Hlem T phi HT Hphi Hvalid Htheo.
-      destruct (Hlem (T ⊩SE phi)); try easy. exfalso.
-      apply K_std_completeness.
-      intros H. destruct (Hlem (T ⊢TC phi)); tauto.
-    Qed.
-*)
-  End LEM_Equivalence.
-
-End KripkeCompleteness.
 *)

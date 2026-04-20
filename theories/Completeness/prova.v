@@ -13,6 +13,87 @@ Require Import Coq.Program.Equality.
 
 Require Import Undecidability.FOL.Semantics.Tarski.FullCore.
 
+From Undecidability Require Import Shared.ListAutomation.
+Import ListAutomationNotations.
+From Undecidability Require Import FOL.Syntax.Core.
+Import FullSyntax.
+Export FullSyntax.
+
+Locate prv.
+
+
+  Implicit Type ff : falsity_flag.
+
+
+  Lemma prv_ind_full {Σ_funcs : funcs_signature} {Σ_preds : preds_signature} :
+  forall P : falsity_flag -> list (form _) -> (form _) -> Prop,
+    (forall (ff : falsity_flag) (A : list form) (phi psi : form),
+        (phi :: A) ⊢I psi -> P ff (phi :: A) psi -> P ff A (phi → psi)) ->
+    (forall (ff : falsity_flag)(A : list form) (phi psi : form),
+        A ⊢I phi → psi -> P ff A (phi → psi) -> A ⊢I phi -> P ff A phi -> P ff A psi) ->
+    (forall (ff : falsity_flag) (A : list form) (phi : form),
+        (map (subst_form ↑) A) ⊢I phi -> P ff (map (subst_form ↑) A) phi -> P ff A (∀ phi)) ->
+    (forall (ff : falsity_flag) (A : list form) (t : term) (phi : form),
+        A ⊢I ∀ phi -> P ff A (∀ phi) -> P ff A phi[t..]) ->
+    (forall (ff : falsity_flag) (A : list form) (t : term) (phi : form),
+        A ⊢I phi[t..] -> P ff A phi[t..] -> P ff A (∃ phi)) ->
+    (forall (ff : falsity_flag) (A : list form) (phi psi : form),
+        A ⊢I ∃ phi ->
+              P ff A (∃ phi) ->
+              (phi :: [p[↑] | p ∈ A]) ⊢I psi[↑] -> P ff (phi :: [p[↑] | p ∈ A]) psi[↑] -> P ff A psi) ->
+    (forall  (A : list form) (phi : form), A ⊢I ⊥ -> P falsity_on A ⊥ -> P falsity_on A phi) ->
+    (forall (ff : falsity_flag) (A : list form) (phi : form), phi el A -> P ff A phi) ->
+    (forall (ff : falsity_flag) (A : list form) (phi psi : form),
+        A ⊢I phi -> P ff A phi -> A ⊢I psi -> P ff A psi -> P ff A (phi ∧ psi)) ->
+    (forall (ff : falsity_flag) (A : list form) (phi psi : form),
+        A ⊢I phi ∧ psi -> P ff A (phi ∧ psi) -> P ff A phi) ->
+    (forall (ff : falsity_flag) (A : list form) (phi psi : form),
+        A ⊢I phi ∧ psi -> P ff A (phi ∧ psi) -> P ff A psi) ->
+    (forall (ff : falsity_flag) (A : list form) (phi psi : form),
+        A ⊢I phi -> P ff A phi -> P ff A (phi ∨ psi)) ->
+    (forall (ff : falsity_flag) (A : list form) (phi psi : form),
+        A ⊢I psi -> P ff A psi -> P ff A (phi ∨ psi)) ->
+    (forall (ff : falsity_flag) (A : list form) (phi psi theta : form),
+        A ⊢I phi ∨ psi ->
+        P ff A (phi ∨ psi) ->
+        (phi :: A) ⊢I theta ->
+        P ff (phi :: A) theta -> (psi :: A) ⊢ theta -> P ff (psi :: A) theta -> P ff A theta) ->
+    forall (ff: falsity_flag) (l : list form) (f14 : form), l ⊢I f14 -> P ff l f14.
+Proof.
+  intros. specialize (@prv_ind _ _ (fun ff => match ff with falsity_on => P | _ => fun _ _ _ => True end)). intros H'.
+  apply H' with (ff := falsity_on); clear H'. all: intros; try destruct ff; trivial. all: intuition eauto 2.
+Qed.
+
+
+Inductive my_prv : forall (ff : falsity_flag) (p : peirce), list form -> form -> Prop :=
+  | II {ff} {p} A phi psi : my_prv _ (phi::A)  psi -> my_prv _ A  (phi → psi)
+  | Exp {p} A phi : my_prv p A falsity -> my_prv p A phi
+  | Pc {ff} A phi psi : my_prv class A (((phi → psi) → phi) → phi).
+
+
+Lemma my_prv_ind' {ff: falsity_flag}:
+  match ff with 
+  | falsity_on => (forall P: list (form falsity_on ) -> form falsity_on -> Prop,
+                  (forall (A : list (form falsity_on)) (phi psi : (form falsity_on)),
+                      @my_prv falsity_on intu (phi::A)  psi -> P (phi::A)  psi -> P A (phi → psi)) ->
+                  (forall (A : list (form falsity_on)) (phi  : (form falsity_on)),
+                      @my_prv falsity_on intu A falsity -> P A falsity -> P A phi) ->
+                   forall (l : list form) (fin_form : form falsity_on), my_prv intu l fin_form -> P l fin_form)
+  | falsity_off => (forall P: list (form _ ) -> form _ -> Prop,
+                  (forall (A : list (form _)) (phi psi : (form _)),
+                      @my_prv ff intu (phi::A)  psi -> P (phi::A)  psi -> P A (phi → psi)) ->
+                  forall (l : list form) (fin_form : form ), my_prv intu l fin_form -> P l fin_form)
+                  end.
+Proof.
+  destruct ff. intros. 
+
+  specialize (my_prv_ind' (fun ff => match ff with 
+                                      | falsity_on =>  (fun p => match p with 
+                                                        | intu => P intu 
+                                                        | _ => fun  _ _ => True end)
+                                      | falsity_off =>            => fun  _ _ _=> True end)). 
+  specialize (@my_prv falsity_on intu).
+
  
 
 
