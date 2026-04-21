@@ -432,14 +432,13 @@ Section ConstantDomain.
   (* Context {M : kmodel}. *) 
   Definition constant_domain (fr : kframe)(M : kmodel) :  Prop :=
       (forall (u v: nodes) (j: domain), world u j <-> world v j).
-
-  
+  (*
   Definition constant_domain' (fr : kframe)(M : kmodel) :  Prop :=
       forall (u : nodes) (j: domain), world u j.
   
   Definition non_empty (fr : kframe)(M : kmodel) :  Prop :=
       exists (u : nodes) (j: domain), world u j.
-
+  *)
   Definition constant_domain_meta :=
   forall (X: Type)(A: X -> Prop)(B: Prop),
     (forall x: X, (A x \/ B)) -> ((forall x: X, A x) \/ B).
@@ -450,6 +449,13 @@ Section ConstantDomain.
     intros. 
     eapply H. eauto.
   Qed.
+
+  Lemma cdm_imp_EM :
+    constant_domain_meta -> forall (A:Prop), (A->False) \/ A.
+  Proof.
+    intros. eapply cdm_distr_impl_or; eauto.
+  Qed.
+
 (*
   Lemma CD_exist (fr : kframe)(M: kmodel)(u : nodes) (rho: nat -> domain) (phi: form): 
     constant_domain M -> (ksat u rho (quant All phi) <-> forall (j: domain), (exists (v: nodes), world v j) -> (j .: rho) ⊩( u, M) phi).
@@ -472,34 +478,34 @@ Section ConstantDomain.
 
 (* rho ⊩( u, M) ((∀ phi ∨ psi [↑]) → (∀ phi) ∨ psi [↑])*)
   Lemma CD_imp_CD_axiom_ (M: kmodel)(rho: nat -> my_KripkeCompleteness.domain)(phi psi: form):
-        non_empty M-> constant_domain M -> constant_domain_meta -> 
+         constant_domain M -> constant_domain_meta -> 
         forall (u : nodes), good u rho ->
         ksat u rho (bin Impl (quant All (bin Disj phi (psi[↑]))) (bin Disj (quant All  phi) (psi))).
     Proof.
     simpl.
     intros.
-    unfold constant_domain_meta in H1.
-    eapply H1; intros.
+    unfold constant_domain in H.
+    unfold constant_domain_meta in H0.
+    eapply H0; intros.
     eapply cdm_distr_impl_or; eauto; intros.
-    eapply H1; intros.
-    eapply cdm_distr_impl_or; eauto; intros.
-    pose proof (H4 x H5 x0 H6).
-    assert (world v x0).
-    eapply H0; eauto.
-    assert ((world v x0 -> (x0 .: rho) ⊩( v, M) phi) \/ (x0 .: rho) ⊩( v, M) psi [↑]).
-    eapply H1; eapply H4; eapply reach_refl.
-    destruct H9.
-    left. eapply ksat_iff; eauto using good_shift, good_mon.
-    left; eauto.
-    right. erewrite <- ksat_shift in H7; eauto using good_mon.
-    
-    pose proof (H4 H8).
-    eapply (cdm_distr_impl_or H1) in H4.
-        
-    Admitted.
-
-     Definition CDA_meta (fr : kframe)(M : kmodel) :  Prop :=
-    forall j : domain, (j .: rho) ⊩( v, M) phi \/ (j .: rho) ⊩( v, M) psi [↑]
+    eapply H0; intros.
+    eapply cdm_distr_impl_or; eauto. 
+    revert x0.
+    assert ((forall x0 : domain, world x x0 -> (x0 .: rho) ⊩( x, M) phi \/ (x0 .: rho) ⊩( v, M) psi [↑])
+    <-> (forall x0 : domain, world x x0 -> (x0 .: rho) ⊩( x, M) phi \/ rho ⊩( v, M) psi)
+    ).
+    split; intros; specialize (H5 x0 H6); destruct H5. 
+      * left; eauto.
+      * right. eapply ksat_shift; eauto using good_mon; eapply H; eauto. 
+      * left; eauto.
+      * right. erewrite <- ksat_shift; eauto using good_mon; eapply H; eauto.
+    * eapply H5.  intros.
+    assert (world v x0). eapply H; eauto.
+    specialize (H3 v (reach_refl v) x0 H7).
+    destruct H3.
+    left; eapply ksat_mon; eauto using H3, good_mon, good_shift.
+    right; apply H3. 
+    Qed.
 
 End ConstantDomain.
 
@@ -678,44 +684,32 @@ Section Example_nonConstantDomain.
       right; f_equal. eapply H. eapply tail_vec_1.
     Qed.
 
-    Program Instance my_kmodel: @kmodel _ _ my_frm :=
+    #[refine] Instance my_kmodel: @kmodel _ _ my_frm :=
     {|
         I := fun (w: nodes) => match w with 
                               | u => my_I_u
                               | v => my_I_v
-                              end
-      |}.
-    Next Obligation.
-      induction u0; induction v0; simpl; reflexivity.
-    Qed.
-    Next Obligation.
-      induction u0; simpl; auto.
-    Qed.
-    Next Obligation.
-      remember P0 as PP.
-      induction PP; induction u0; induction v0; cbn; eauto; unfold in_dom in a0.
-      all : dependent destruction vv; destruct h.
-      dependent destruction vv.
-      simpl in H; eauto.
-      all : dependent destruction vv. eauto.
-      all: simpl in H; eauto.
-    Next Obligation.
-      induction u0; induction v0; induction P0; eauto.
-      simpl in *; destruct vv in H; eauto;
-      destruct h in H; eauto.
-      all: dependent destruction vv; destruct h.
-      dependent destruction vv. destruct t in H; eauto.
-      all: dependent destruction vv; eauto. destruct t in H; eauto. 
-    Qed.
-    Next Obligation.
-      induction u0; simpl in *; eauto. destruct x; eauto.
-      dependent destruction vv; induction h; destruct vv; destruct P0; eauto.
-      apply In_inv in H0; simpl in H0; destruct H0.
-      discriminate H0; eauto.
-      apply In_inv in H0; simpl in H0; eauto.
-    Qed.
+                              end;
+    |}.
+    Proof.
+      - induction u0; induction v0; simpl; reflexivity.
+      - induction u0; simpl; auto.
+      - intros.
+        remember P0 as PP.
+        induction PP; induction u0; induction v0; cbn; eauto; unfold in_dom in a0.
+        all : dependent destruction vv; destruct h.
+        dependent destruction vv.
+        simpl in H; eauto.
+        all : dependent destruction vv. eauto.
+        all: simpl in H; eauto.
+      - unfold in_dom; intros; induction u0; simpl in *; eauto. 
+        dependent destruction vv; induction h; destruct vv; destruct P0; eauto.
+        destruct x; eauto.
+        apply In_inv in H0; simpl in H0; destruct H0.
+        discriminate H0.
+        apply In_inv in H0; simpl in H0; eauto.
+    Defined.
 
-      End Example_nonConstantDomain.
   Definition A (alpha: t term 1): form :=  atom Q alpha.
   Definition B (alpha: t term 1): form := quant Ex (atom P alpha).
 
@@ -739,9 +733,10 @@ Section Example_nonConstantDomain.
   Proof.
     simpl. intros.
     induction v0.
-    + left. simpl.
-      eapply in_u in H1. rewrite H1; eauto.
-    + right. exists b. split; eauto.
+    + left. 
+      eapply in_u in H1. rewrite H1.
+      unfold i_atom; unfold my_I_u; eauto.
+    + right; exists b; split. eauto. eauto.
   Qed.
 
   Lemma prop2 (rho: nat -> my_domain):
@@ -777,16 +772,7 @@ Section Example_nonConstantDomain.
       eapply In_inv in H4; simpl in H4; eauto.
   Qed.
 
-
-  End Example_nonConstantDomain.
-
-
-
-
-  
-
-    Locate ListAutomationNotations.
-
+End Example_nonConstantDomain.
 
 Section Bottom.
 

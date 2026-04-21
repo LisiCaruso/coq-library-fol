@@ -11,7 +11,6 @@ Require Import Coq.Program.Equality.
 
 Require Import Undecidability.FOL.Semantics.Tarski.FullCore.
 
-(* ** Universal Models *)
 Section VariableDomainKripke.
   Context {Σ_funcs : funcs_signature}.
   Context {Σ_preds : preds_signature}.

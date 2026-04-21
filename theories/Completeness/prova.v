@@ -21,11 +21,14 @@ Export FullSyntax.
 
 Locate prv.
 
+Section intu_ind.
 
-  Implicit Type ff : falsity_flag.
+  Context {Σ_funcs : funcs_signature}.
+  Context {Σ_preds : preds_signature}.
 
 
-  Lemma prv_ind_full {Σ_funcs : funcs_signature} {Σ_preds : preds_signature} :
+
+  Lemma prv_ind_full :
   forall P : falsity_flag -> list (form _) -> (form _) -> Prop,
     (forall (ff : falsity_flag) (A : list form) (phi psi : form),
         (phi :: A) ⊢I psi -> P ff (phi :: A) psi -> P ff A (phi → psi)) ->
@@ -57,7 +60,7 @@ Locate prv.
         A ⊢I phi ∨ psi ->
         P ff A (phi ∨ psi) ->
         (phi :: A) ⊢I theta ->
-        P ff (phi :: A) theta -> (psi :: A) ⊢ theta -> P ff (psi :: A) theta -> P ff A theta) ->
+        P ff (phi :: A) theta -> (psi :: A) ⊢I theta -> P ff (psi :: A) theta -> P ff A theta) ->
     forall (ff: falsity_flag) (l : list form) (f14 : form), l ⊢I f14 -> P ff l f14.
 Proof.
   intros. specialize (@prv_ind _ _ (fun ff => match ff with falsity_on => P | _ => fun _ _ _ => True end)). intros H'.
