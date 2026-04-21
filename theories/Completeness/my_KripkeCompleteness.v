@@ -365,13 +365,10 @@ Section Soundness.
     forall (ff: falsity_flag) (l : list (form ff)) (f14 : form ff), l ⊢I f14 -> P ff l f14.
 Proof.
   intros. 
-  specialize (@prv_ind _ _ (fun ff => match ff with 
-                                      | falsity_on  =>  (fun p => match p with 
-                                                        | intu => P _  
+  specialize (@prv_ind _ _ (fun ff => (fun p => match p with 
+                                                        | intu => P ff  
                                                         | _ => fun  _ _ => True end)
-                                      | falsity_off  => (fun p => match p with 
-                                                        | intu => P falsity_off
-                                                        | _ => fun  _ _ => True end) end)).
+                                      )).
   intros H'; dependent destruction ff; 
   [apply H' with (ff := falsity_off) (p := intu) | apply H' with (ff := falsity_on) (p := intu)];
   clear H'; intros; try destruct ff; try destruct p;
@@ -379,110 +376,54 @@ Proof.
 Qed.
 
 Arguments prv {_ _ _} _.
-(*
+
 Lemma soundness {ff : falsity_flag} (A : list (form ff))(phi: (form ff)):
     prv intu A phi -> kvalid_ctx A phi.
   Proof.
     unfold kvalid_ctx.
-    intros H M. 
-    induction H using prv_ind_intu.
-
-    simpl;  intros u rho gd Hp; intros; 
-    try simpl in IHprv_intu_on.
-    * eapply IHprv_intu_on; eauto using good_mon.
-      simpl; intros. destruct H3; [rewrite <- H3 | eapply ksat_mon]; eauto.
-    * simpl in IHprv_intu_on1; eapply IHprv_intu_on1. 4: eapply  IHprv_intu_on2. 
+    intros H M.
+    apply (prv_ind_intu (P := fun ff A phi => forall (u : nodes) (rho : nat -> domain),
+good u rho -> (forall psi : form ff, psi el A -> rho ⊩( u, M) psi) ->
+rho ⊩( u, M) phi)); eauto; simpl;  intros ff1 A1 ; intros.
+    (*try simpl in IHprv_intu_on.*)
+    * eapply H1; eauto using good_mon.
+      simpl; intros. destruct H6; [rewrite <- H6 | eapply ksat_mon]; eauto.
+    * eapply H1. 4: eapply  H3. 
       all: eauto using reach_refl.
-    * eapply IHprv_intu_on; eauto using good_mon, good_shift.
-      intros psi [psi' [<- HH]] % in_map_iff. 
+    * eapply H1; eauto using good_mon, good_shift.
+      intros psi0 [psi' [<- HH]] % in_map_iff. 
       rewrite ksat_comp; eauto using good_mon, good_shift.
       eapply ksat_mon; eauto using good_comp.
     * erewrite ksat_comp; eauto. 
       erewrite ksat_ext. 
-      eapply (IHprv_intu_on u rho gd Hp u (reach_refl u) (eval rho t)).
+      eapply (H1 u rho H2 H3 u (reach_refl u) (eval rho t)).
       all: eauto using reach_refl, good_comp, good_eval.
       intros; unfold ">>"; induction x; simpl; reflexivity. 
     * exists (@eval _ _  _ (I u) rho t); split.
       now eapply good_eval.
-      specialize (IHprv_intu_on  u rho);  
-      apply ksat_comp in IHprv_intu_on; eauto.
+      specialize (H1  u rho);  
+      apply ksat_comp in H1; eauto.
       eapply ksat_ext. eapply good_shift; eauto using good_eval.
-      2: eapply IHprv_intu_on. 
+      2: eapply H1. 
       intros. induction x; cbn; reflexivity.
-    * specialize (IHprv_intu_on1 u rho gd Hp); simpl in IHprv_intu_on1.
-      destruct IHprv_intu_on1 as [j (wj, IH)].
+    * specialize (H1 u rho H4 H5). 
+      destruct H1 as [j (wj, IH)].
       eapply ksat_shift; eauto.
-      eapply IHprv_intu_on2; eauto using good_shift.
-      intros. simpl in H0; destruct H0.
-      rewrite <- H0; eauto.
-      eapply in_map_iff in H0; destruct H0 as [psh (eq, xelA)].
+      eapply H3; eauto using good_shift.
+      intros. destruct H1.
+      rewrite <- H1; eauto.
+      eapply in_map_iff in H1; destruct H1 as [psh (eq, elA1)].
       rewrite <- eq; erewrite <- ksat_shift; eauto. 
-    * simpl in IHprv_intu_on. specialize (IHprv_intu_on u rho gd Hp); eauto. 
-    * apply Hp; eauto.
-    * split; [eapply IHprv_intu_on1 | eapply IHprv_intu_on2]; eauto.
-    * simpl in IHprv_intu_on. eapply IHprv_intu_on; eauto.
-    * simpl in IHprv_intu_on. eapply IHprv_intu_on; eauto.
-    * left; eapply IHprv_intu_on; eauto.
-    * right; eapply IHprv_intu_on; eauto.
-    * specialize (IHprv_intu_on1 u rho gd Hp); simpl in IHprv_intu_on1; destruct IHprv_intu_on1 as [IH1 | IH2];
-      [eapply  IHprv_intu_on2 | eapply IHprv_intu_on3]; eauto; intros; simpl in H0; destruct H0 as [HH1 | HH2]; try rewrite <- HH1; eauto.
+    * specialize (H1 u rho H2 H3); eauto. 
+    * split; [eapply H1 | eapply H3]; eauto.
+    * eapply H1; eauto.
+    * eapply H1; eauto.
+    * left; eapply H1; eauto.
+    * right; eapply H1; eauto.
+    * specialize (H1 u rho H6 H7); destruct H1 as [IH1 | IH2];
+      [eapply  H3 | eapply H5]; eauto; intros; simpl in H1; destruct H1 as [HH1 | HH2]; try rewrite <- HH1; eauto.
   Qed.  
     
-
-  Lemma soundness_off {ff : falsity_flag} (A : list (form falsity_off))(phi: (form falsity_off)):
-    ff = falsity_off -> prv_intu_off A phi -> kvalid_ctx A phi.
-  Proof.
-    intros;
-    unfold kvalid_ctx. intros M.
-    induction H0 using prv_ind_intu_falsity_off; simpl; intros u rho gd Hp; intros; 
-    try simpl in IHprv_intu_on.
-    * eapply IHprv_intu_off; eauto using good_mon.
-      simpl; intros. destruct H3; [rewrite <- H3 | eapply ksat_mon]; eauto.
-    * simpl in IHprv_intu_off1; eapply IHprv_intu_off1. 4: eapply  IHprv_intu_off2. 
-      all: eauto using reach_refl.
-    * eapply IHprv_intu_off; eauto using good_mon, good_shift.
-      intros psi [psi' [<- HH]] % in_map_iff. 
-      rewrite ksat_comp; eauto using good_mon, good_shift.
-      eapply ksat_mon; eauto using good_comp.
-    * erewrite ksat_comp; eauto. 
-      erewrite ksat_ext. 
-      eapply (IHprv_intu_off u rho gd Hp u (reach_refl u) (eval rho t)).
-      all: eauto using reach_refl, good_comp, good_eval.
-      intros; unfold ">>"; induction x; simpl; reflexivity. 
-    * exists (@eval _ _  _ (I u) rho t); split.
-      now eapply good_eval.
-      specialize (IHprv_intu_off  u rho);  
-      apply ksat_comp in IHprv_intu_off; eauto.
-      eapply ksat_ext. eapply good_shift; eauto using good_eval.
-      2: eapply IHprv_intu_off. 
-      intros. induction x; cbn; reflexivity.
-    * specialize (IHprv_intu_off1 u rho gd Hp); simpl in IHprv_intu_off1.
-      destruct IHprv_intu_off1 as [j (wj, IH)].
-      eapply ksat_shift; eauto.
-      eapply IHprv_intu_off2; eauto using good_shift.
-      intros. simpl in H0; destruct H0.
-      rewrite <- H0; eauto.
-      eapply in_map_iff in H0; destruct H0 as [psh (eq, xelA)].
-      rewrite <- eq; erewrite <- ksat_shift; eauto. 
-    * apply Hp; eauto.
-    * split; [eapply IHprv_intu_off1 | eapply IHprv_intu_off2]; eauto.
-    * simpl in IHprv_intu_off. eapply IHprv_intu_off; eauto.
-    * simpl in IHprv_intu_off. eapply IHprv_intu_off; eauto.
-    * left; eapply IHprv_intu_off; eauto.
-    * right; eapply IHprv_intu_off; eauto.
-    * specialize (IHprv_intu_off1 u rho gd Hp); simpl in IHprv_intu_off1; destruct IHprv_intu_off1 as [IH1 | IH2];
-      [eapply  IHprv_intu_off2 | eapply IHprv_intu_off3]; eauto; intros; simpl in H0; destruct H0 as [HH1 | HH2]; try rewrite <- HH1; eauto.
-  Qed.
-  
-  Lemma soundness {ff : falsity_flag} :
-    forall (A : list (form ff))(phi: (form ff)), prv_intu A phi -> kvalid_ctx A phi.
-  Proof.
-    intros; unfold prv_intu in H. remember ff as current_ff.
-    induction current_ff.
-    eapply soundness_off; eauto. 
-    eapply soundness_on; eauto.
-  Qed.
-  *)
 End Soundness.  
 
 Section ConstantDomain.
