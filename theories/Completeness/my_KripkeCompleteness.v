@@ -180,9 +180,6 @@ Section KripkeSat.
   Context {M : kmodel}.
 (* Context {ff : falsity_flag} *)
 
-
-
-    
     Arguments eval {_ _ _} _ _ _.
 
     Lemma ksat_mon {ff : falsity_flag}(u v: nodes) (rho : nat -> domain) (phi : form) : 
@@ -315,7 +312,7 @@ Section Soundness.
   Definition ktheo (M: kmodel)(phi : form) :=
     forall rho u, good u rho -> ksat M u rho phi.
 
-  Definition kvalid_ctx(*_e*) {ff : falsity_flag}(A : list form) (phi: form) :=
+  Definition kvalid_ctx {ff : falsity_flag}(A : list form) (phi: form) :=
     forall (M: kmodel) (u: nodes) (rho: nat -> domain),
      good u rho -> (forall psi, psi el A -> ksat M u rho psi) -> ksat M u rho phi.
 
@@ -325,6 +322,7 @@ Section Soundness.
 
   Definition ksatis {ff : falsity_flag} phi :=
     exists (M: kmodel) (u: nodes) (rho: nat -> domain), good u rho /\ ksat M u rho phi.
+
 
   
   Arguments form {_ _ _} __.
@@ -364,15 +362,10 @@ Section Soundness.
         P ff (phi :: A) theta -> (psi :: A) ⊢I theta -> P ff (psi :: A) theta -> P ff A theta) ->
     forall (ff: falsity_flag) (l : list (form ff)) (f14 : form ff), l ⊢I f14 -> P ff l f14.
 Proof.
-  intros. 
-  specialize (@prv_ind _ _ (fun ff => (fun p => match p with 
-                                                        | intu => P ff  
-                                                        | _ => fun  _ _ => True end)
-                                      )).
-  intros H'; dependent destruction ff; 
-  [apply H' with (ff := falsity_off) (p := intu) | apply H' with (ff := falsity_on) (p := intu)];
-  clear H'; intros; try destruct ff; try destruct p;
-  trivial; intuition eauto 2.
+  intros.
+  remember intu as temp.
+  induction H13; eauto.
+  discriminate.
 Qed.
 
 Arguments prv {_ _ _} _.
@@ -383,8 +376,8 @@ Lemma soundness {ff : falsity_flag} (A : list (form ff))(phi: (form ff)):
     unfold kvalid_ctx.
     intros H M.
     apply (prv_ind_intu (P := fun ff A phi => forall (u : nodes) (rho : nat -> domain),
-good u rho -> (forall psi : form ff, psi el A -> rho ⊩( u, M) psi) ->
-rho ⊩( u, M) phi)); eauto; simpl;  intros ff1 A1 ; intros.
+          good u rho -> (forall psi : form ff, psi el A -> rho ⊩( u, M) psi) ->
+          rho ⊩( u, M) phi)); eauto; simpl;  intros ff1 A1 ; intros.
     (*try simpl in IHprv_intu_on.*)
     * eapply H1; eauto using good_mon.
       simpl; intros. destruct H6; [rewrite <- H6 | eapply ksat_mon]; eauto.
@@ -426,6 +419,82 @@ rho ⊩( u, M) phi)); eauto; simpl;  intros ff1 A1 ; intros.
     
 End Soundness.  
 
+Section PropKsat.
+  Context {Σf : funcs_signature} {Σp : preds_signature}.
+  Context {frm : kframe}.
+  Context {M : kmodel}. 
+  #[local] Existing Instance falsity_on.
+
+  Arguments ksat {_ _ _ _ _} _ _ _.
+
+  Lemma ksat_DN_in (u: nodes)(rho: nat -> domain)(phi: form) :
+    good u rho ->
+    ksat u rho phi -> ksat u rho (bin Impl (bin Impl (phi) ⊥) ⊥).
+  Proof.
+    simpl; intros.
+    eapply ksat_mon in H; eauto. 
+    specialize (H2 v (reach_refl v)); eauto.
+  Qed.
+
+  Lemma ksat_neg_in_out (u: nodes)(rho: nat -> domain)(phi: form) :
+    good u rho -> 
+    ksat u rho (bin Impl (phi) ⊥) -> ((ksat u rho phi) -> False).
+  Proof.
+    intros.
+    eapply H0; eauto using reach_refl.
+  Qed.
+
+  (*Lemma ksat_neg_out_in (u: nodes)(rho: nat -> domain) :
+    good u rho -> 
+    (forall phi : form, ((ksat u rho phi) -> False) -> ksat u rho (bin Impl (phi) ⊥)) 
+    -> completeness -> EM???*)
+
+    (*-> 
+    (forall phi : form, (ksat u rho phi) \/ ((ksat u rho phi) -> False)). *)
+  Lemma kvalid_ctx_bot_DNE (T : list form):
+    (((kvalid_ctx T ⊥) -> False )-> False) <-> (kvalid_ctx T ⊥).
+  Proof.
+    split; intros; eauto.
+    unfold kvalid_ctx in *; simpl; intros.
+    eapply H; simpl; intros. eapply H2; eauto.
+  Qed.
+
+  Lemma ksat_neg (M0 : kmodel)(u: nodes)(rho: nat -> domain)(phi: form):
+    (rho ⊩( u, M0) (¬ phi) <-> (forall v: nodes, reachable u v -> (rho ⊩( v, M0) phi) ->  False)).
+  Proof. 
+    simpl; now eauto.
+  Qed.
+
+  Lemma kvalid_ctx_DN_out_in (T : list form)(phi: form):
+    (((kvalid_ctx T phi) -> False )-> False) -> (kvalid_ctx T (bin Impl (bin Impl (phi) ⊥) ⊥)).
+  Proof.
+    unfold kvalid_ctx; intros.
+    eapply (ksat_neg M0 u rho (¬ phi)); simpl; intros. 
+    eapply H; intros.
+    assert (forall psi : form, psi el T -> rho ⊩( v, M0) psi); intros. eapply ksat_mon; eauto.
+    specialize (H4 M0 v rho (good_mon H0 H2) H5).
+    eapply H3; eauto using reach_refl.
+  Qed.
+
+ (* Lemma ksat_DN_in_out (u: nodes)(rho: nat -> domain)(phi: form) :
+    good u rho ->
+    ksat u rho (bin Impl (bin Impl (phi) ⊥) ⊥) -> ((ksat u rho phi -> False ) -> False).
+THIS IS FALSE
+
+  Definition EM (P: Prop): Prop := P \/ (P-> False).
+
+  Lemma ksat_DNE' (u: nodes)(rho: nat -> domain)(phi: form) :
+    good u rho ->
+    (ksat u rho phi <-> ksat u rho (bin Impl (bin Impl (phi) ⊥) ⊥)) -> EM (ksat u rho phi).
+  Proof.
+    intros; 
+THIS IS FALSE I THINK
+  *)
+
+    
+    
+End PropKsat.
+
 Section ConstantDomain.
   Context {Σf : funcs_signature} {Σp : preds_signature}.
   Context {frm : kframe}.
@@ -456,6 +525,18 @@ Section ConstantDomain.
     intros. eapply cdm_distr_impl_or; eauto.
   Qed.
 
+  Lemma EM_imp_cdm : 
+    (forall (A:Prop), (A->False) \/ A) -> constant_domain_meta.
+  Proof.
+    unfold constant_domain_meta; intros.
+    specialize (H B); destruct H.
+    + left. intros. specialize (H0 x).
+      destruct H0.
+      ++  eapply H0. 
+      ++  eapply H in H0. eauto.
+    + right. eapply H.
+  Qed. 
+
 (*
   Lemma CD_exist (fr : kframe)(M: kmodel)(u : nodes) (rho: nat -> domain) (phi: form): 
     constant_domain M -> (ksat u rho (quant All phi) <-> forall (j: domain), (exists (v: nodes), world v j) -> (j .: rho) ⊩( u, M) phi).
@@ -477,15 +558,13 @@ Section ConstantDomain.
   *)
 
 (* rho ⊩( u, M) ((∀ phi ∨ psi [↑]) → (∀ phi) ∨ psi [↑])*)
-  Lemma CD_imp_CD_axiom_ (M: kmodel)(rho: nat -> my_KripkeCompleteness.domain)(phi psi: form):
-         constant_domain M -> constant_domain_meta -> 
+  Lemma CD_imp_CD_axiom (M: kmodel)(rho: nat -> my_KripkeCompleteness.domain)(phi psi: form):
+        constant_domain M -> constant_domain_meta -> 
         forall (u : nodes), good u rho ->
         ksat u rho (bin Impl (quant All (bin Disj phi (psi[↑]))) (bin Disj (quant All  phi) (psi))).
     Proof.
-    simpl.
-    intros.
-    unfold constant_domain in H.
-    unfold constant_domain_meta in H0.
+    simpl; intros.
+    unfold constant_domain in H; unfold constant_domain_meta in H0.
     eapply H0; intros.
     eapply cdm_distr_impl_or; eauto; intros.
     eapply H0; intros.
@@ -494,17 +573,15 @@ Section ConstantDomain.
     assert ((forall x0 : domain, world x x0 -> (x0 .: rho) ⊩( x, M) phi \/ (x0 .: rho) ⊩( v, M) psi [↑])
     <-> (forall x0 : domain, world x x0 -> (x0 .: rho) ⊩( x, M) phi \/ rho ⊩( v, M) psi)
     ).
-    split; intros; specialize (H5 x0 H6); destruct H5. 
-      * left; eauto.
-      * right. eapply ksat_shift; eauto using good_mon; eapply H; eauto. 
-      * left; eauto.
-      * right. erewrite <- ksat_shift; eauto using good_mon; eapply H; eauto.
-    * eapply H5.  intros.
-    assert (world v x0). eapply H; eauto.
-    specialize (H3 v (reach_refl v) x0 H7).
-    destruct H3.
-    left; eapply ksat_mon; eauto using H3, good_mon, good_shift.
-    right; apply H3. 
+    * split; intros; specialize (H5 x0 H6); destruct H5. 
+      1,3: left; eauto.
+      1,2: right. 1: eapply ksat_shift. 4: erewrite <- ksat_shift. 
+      all: eauto using good_mon; eapply H; eauto. 
+    * eapply H5; intros.
+      pose proof (H x v x0). eapply H7 in H6.
+      specialize (H3 v (reach_refl v) x0 H6); destruct H3.
+      left; eapply ksat_mon; eauto using H3, good_mon, good_shift.
+      right; apply H3. 
     Qed.
 
 End ConstantDomain.
@@ -571,6 +648,8 @@ Section Example_nonConstantDomain.
     Next Obligation.
       induction u0; induction v0; induction x; eauto.
     Qed.
+
+    Print interp.
 
     Instance my_I_u : @interp Σ_funcs Σ_preds my_domain :=
       {| 
@@ -774,117 +853,141 @@ Section Example_nonConstantDomain.
 
 End Example_nonConstantDomain.
 
-Section Bottom.
+Section Completeness.
+   #[local] Existing Instance falsity_on.
+  Context {Σf : funcs_signature} {Σp : preds_signature}.
+  Instance C_Σf: funcs_signature :=
+    {|
+      syms := sum (syms)  (nat*nat);
+      ar_syms := fun f => (match f with 
+                | inl f => ar_syms f
+                | inr (_, _) => 0 end)
+    |}.
+ 
+Print term.
 
-  Context {Σ_funcs : funcs_signature}.
-  Context {Σ_preds : preds_signature}.
+  Definition is_bounded_C (n : nat)(f: syms): Prop :=
+  match f with 
+  | inl _ => False
+  | inr (m, c) => m < n
+  end. 
 
-  Locate subst_term.
+  Definition is_not_C (f: syms):Prop :=
+  match f with 
+  | inl _ => True
+  | inr _ => False
+  end.
 
- (* Lemma universal_interp_eval u rho t :
-    eval rho t= t`[rho].
+  Definition is_C (f: syms): Prop :=
+  exists n, is_bounded_C n f.
+
+  Inductive term_c_bounded : nat-> term -> Prop :=
+  | bounded_var : forall (n x : nat), term_c_bounded n (var x)
+  | bounded_c   : forall (n k c: nat), k<n -> term_c_bounded n (func (inr (k, c)) (nil _) )
+  | bounded_f   : forall (n:nat)f (vv: (t term (ar_syms (inl f)))), (forall (trm: term),  InT trm vv -> term_c_bounded n trm) -> term_c_bounded n (func (inl f) vv).
+  
+  Inductive c_bounded : nat -> form -> Prop :=
+  | bounded_falsity : forall (n:nat), c_bounded n falsity 
+  | bounded_p : forall (n : nat)(P: preds)(vv: (t term (ar_preds P))), (forall (trm: term),  InT trm vv -> term_c_bounded n trm) -> c_bounded n (atom P vv)
+  | bounded_bin: forall (n: nat)(phi psi: form)(conn : full_logic_sym), (c_bounded n phi) ->(c_bounded n psi) -> c_bounded n (bin conn phi psi)
+  | bounded_quant: forall (n: nat)(phi: form)(q : full_logic_quant), (c_bounded n phi) -> c_bounded n (quant q phi).
+
+  Definition c_closed (phi: form):= c_bounded 0 phi.
+
+  Definition prv_inf (Gamma : form -> Prop)(phi: form) :=
+    exists (Gamma_fin : list form), (forall (psi:form), List.In psi Gamma_fin -> Gamma psi) /\ Gamma_fin ⊢I phi.
+    
+  Notation "A ⊢ phi" := (prv_inf A phi) (at level 55).
+
+  Definition consistent A := ~ (A ⊢ ⊥).  
+
+  Definition n_saturated (n : nat)(Gamma : form -> Prop): Prop :=
+    consistent Gamma /\ 
+    (forall phi: form, Gamma phi -> c_bounded (n+1) phi) /\
+    (forall phi: form, Gamma ⊢ phi <-> Gamma phi) /\ 
+    (forall phi psi: form, Gamma ⊢ (bin Disj phi psi) -> ((Gamma phi) \/ (Gamma psi))) /\
+    (forall phi: form, Gamma ⊢ (quant Ex phi) -> exists m c : nat, m<n /\ Gamma (phi[(func (inr (m, c)) (nil _) )..])).
+
+  Definition ctx_incl (Gamma Delta : form -> Prop) :=
+    forall phi: form, Gamma phi -> Delta phi. 
+
+  Notation "A <<=C B" := (ctx_incl A B) (at level 20).  
+    
+  Lemma saturation_lemma :
+    forall (n: nat)(Gamma : form -> Prop), (forall psi: form, Gamma psi -> c_bounded n psi)  -> 
+    exists (Delta: form -> Prop), Gamma <<=C Delta /\  n_saturated n Gamma.
   Proof.
-    now induction t; cbn. 
-  Qed.
-*)
-  Instance model_bot : interp term :=
-    {| i_func := func; i_atom := fun P v => False|}.
+    admit.
+  Admitted.
 
- Section Contexts.
+ (** Definition canonical_model : Type . *)
+  Definition saturated (Gamma : form -> Prop): Prop := exists n, n_saturated n Gamma.
 
-  Print Vector.map.
-(*
-  Fixpoint term_in_form (nu : form)(t : term): Prop :=
-    match nu with 
-      | atom P vv => term_in_term ()
-      | falsity => False
-      | bin _ phi psi => term_in_form phi \/ term_in_form psi
-      | quant _ phi =>  term_in_form phi
-      end.
+  Inductive can_nodes' (n: nat)(Gamma: form -> Prop): Prop :=
+  intro n : forall (Gamma: form -> Prop), saturated Gamma -> can_nodes' n Gamma.
 
-  Fixpoint world_ctx (A : list form)(t : term): Prop :=
-    match A with 
-      | [] => False
-      | [phi] => 
-*)
-    Program Instance K_frm_ctx {ff:falsity_flag} : kframe :=
+  Definition can_nodes : Type := { Gamma| saturated Gamma }.
+
+  Definition can_index (Gamma : can_nodes): nat.
+  Proof.
+    unfold can_nodes in Gamma.
+    unfold saturated in Gamma.
+    destruct Gamma as 
+  
+
+
+  Definition can_world (Gamma: can_nodes)(trm : term): Prop :=
+    term_c_bounded (proj2_sig Gamma) trm .
+
+  Program Instance canonical_model_frm : kframe :=
       {|
         domain := term;
-        nodes := list form ;
-        reachable := @incl form ;
-        world := fun u t => True; (* this is wrong, I don't know what to put here*)
+        nodes := sat_worlds;
+        reachable := ctx_incl;
+        world := sat_worlds -> term;
       |}.
- Qed.
-
-  Program Instance K_ctx {ff: falsity_flag}: @kmodel _ _ K_frm_ctx:=
-    {|
-        I := fun (u: nodes) => model_bot; 
-      |}.
-    (*
     Next Obligation.
-      admit.
-    Next Obligation.
-      abstr
-      abstract (eauto using seq_Weak).
+      induction u0; simpl; tauto.
     Qed.
-    *)
-        (*k_interp := model_bot ;
-        k_P := fun A P v => sprv A None (atom P v) 
-        
-
-Print FragmentSyntax.frag_operators.
-Print FullSyntax.full_operators.
-
-    Definition F_P {ff} : list (@form _ _ _ ff) -> Prop := 
-        match ff with 
-        | falsity_on => fun (n: list form) => sprv n Some ⊥ (*taken away sprv and Some*)
-        | _ => fun _ => False end.
-
-    Lemma mon_F {ff:falsity_flag} (u v : nodes) : reachable u v -> F_P u -> F_P v.
-    Proof.
-      cbn. unfold F_P. destruct ff; try easy. intros H H1. eapply seq_Weak; [ exact H1| exact H].
+    Next Obligation.
+      induction u0; induction v0; induction w; eauto.
+    Qed.
+    Next Obligation.
+      induction u0; induction v0; induction x; eauto.
     Qed.
 
-    Notation "rho '⊩⊥(' u , M ')' phi" :=  (@ksat_bot _ _ _ M _ F_P mon_F u rho phi) (at level 20).
 
+  Definition kmodel_ctx {ff : falsity_flag}(Gamma : form -> Prop) (phi: form)  :=
+    forall (frm:kframe)(M: kmodel)(u: nodes)(rho: nat-> domain), (forall psi: form, Gamma psi -> ksat u rho psi) -> ksat u rho phi.
 
-
-  Program Definition kmodel_bot 
-    (F_P : @nodes _ _ _ M -> Prop)
-    (mon_F : forall u v, reachable u v -> F_P u -> F_P v)
-     : @kmodel Σ_funcs (@Σ_preds_bot Σ_preds) domain := {|
-    nodes := @nodes _ _ _ M ;
-    reachable := @reachable _ _ _ M ;
-    k_interp := interp_bot False (@k_interp _ _ _ M) ;
-    k_P := fun n P => match P with inl _ => fun _ => F_P n | inr P' => @k_P _ _ _ M n P' end
-  |}.
-  Next Obligation. apply reach_refl. Qed.
-  Next Obligation. now apply reach_tran with v. Qed.
-  Next Obligation. destruct P as [|P'].
-    + now apply mon_F with u.
-    + now apply mon_P with u.
-  Qed.
-
-  Definition ksat_bot 
-    {ff : falsity_flag} (F_P : @nodes _ _ _ M -> Prop)
-    (mon_F : forall u v, reachable u v -> F_P u -> F_P v)
-    u (rho : env domain) (phi : form) : Prop 
-    := @ksat _ Σ_preds_bot domain (kmodel_bot mon_F) falsity_off u rho (falsity_to_pred phi).
-  Arguments ksat_bot {_} _ _ _ _.
-
-  Lemma sat_bot_False {ff:falsity_flag} u rho phi
-    (e : forall u v, reachable u v -> False -> False)
-    : @ksat_bot ff (fun _ => False) e u rho phi <-> @ksat _ _ domain M ff u rho phi.
+  Lemma classical_strong_completeness : 
+    forall (Gamma: form -> Prop)(phi : form),
+    kmodel_ctx Gamma phi -> Gamma ⊢ phi.
   Proof.
-    induction phi in rho,u|-*.
-    - easy.
-    - easy.
-    - destruct b0. unfold sat_bot, falsity_to_pred in *. cbn.
-      split; intros H v Hreach H1 %IHphi1; apply IHphi2; now apply H, H1.
-    - destruct q. unfold sat_bot, falsity_to_pred in *. cbn.
-      split; intros H d; apply IHphi, H.
-  Qed.
+    admit.
+  Admitted.
+    
+  
 
-End Bottom.
 
-*)
+
+
+
+
+
+
+
+  Context {frm : kframe}.
+  Context {M : kmodel}. 
+
+    Definition cons A := ~ A ⊢I ⊥.
+    Definition cons_ctx := { A | cons A }.
+    Definition ctx_incl (A B : cons_ctx) := incl (proj1_sig A) (proj1_sig B).
+
+    #[local] Hint Unfold cons cons_ctx ctx_incl : core.
+
+    Notation "A <<=C B" := (ctx_incl A B) (at level 20).
+    Notation "A ⊢SC phi" := ((proj1_sig A) ⊢SE phi) (at level 20).
+    Notation "A ;; psi ⊢sC phi" := ((proj1_sig A) ;; psi ⊢sE phi) (at level 70).
+
+End Completeness.

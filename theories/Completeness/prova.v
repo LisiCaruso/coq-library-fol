@@ -19,6 +19,82 @@ From Undecidability Require Import FOL.Syntax.Core.
 Import FullSyntax.
 Export FullSyntax.
 
+Lemma boh:
+  forall (A B: Prop), (A <-> B)-> ((A -> False) <-> (B -> False)).
+Proof.
+  intros.
+  split; intros.
+  1, 2:eapply H0; eapply H; eapply H1.
+Qed.
+
+Lemma boh2: 
+  forall (A B: Prop), (A \/ B) -> (A -> False) -> B.
+Proof.
+  intros. destruct H. apply H0 in H; eauto. eauto.
+Qed.
+
+Lemma boh3: 
+  forall (A B C: Prop), ((A /\ B) -> C) <->(A -> B -> C).
+Proof.
+  split; intros; eapply H;
+  eauto; destruct H0; eauto.
+Qed.
+
+Lemma forall_not_exists_not : 
+  forall (X: Type) (A: X -> Prop), 
+    (forall x: X, A x) -> ((exists x: X, A x -> False) -> False).
+Proof.
+    intros.
+    destruct H0.
+    specialize (H0 (H x)).
+    apply H0.
+Qed.
+
+Lemma existsl_not_forall_not : 
+  forall (X: Type) (A: X -> Prop), 
+    (exists x: X, A x) ->((forall x: X, A x -> False) -> False).
+Proof.
+  intros.
+  destruct H.
+  specialize (H0 x H); eauto.
+Qed.
+
+Definition WEM :=
+  forall P: Prop, (P -> False) \/ ((P -> False) -> False).
+
+Definition DNS :=
+  forall (X: Type) (A: X -> Prop),
+  forall x: X, ((A x -> False) -> False) -> (((forall x: X, A x ) -> False) -> False).
+
+
+Lemma question :
+  forall (X: Type)(A: X -> Prop),
+  WEM ->
+  (((exists x, A x) -> False) -> False) -> exists x, ((A x -> False) -> False) .
+Proof.
+  intros.
+  unfold WEM in H.
+  
+
+
+Lemma WEM_implies_DNS : 
+  WEM -> DNS.
+Proof.
+  unfold DNS.
+  intros.
+  unfold WEM in H.
+  pose proof (H (exists x: X, (A x -> A x))).
+  destruct H2.
+  * eapply H0. intros. eapply H2. exists x. intros. auto.
+  * eapply H0. intros. eapply   
+  eapply H1.
+  intros.
+
+  apply (H1 (H2 x)).
+Qed.
+
+
+
 Locate prv.
 
 Section intu_ind.
@@ -273,4 +349,120 @@ instead of stating this with "if x is not free in psi", I will state it with "if
         intros.  
     Qed.
     
+
+
+Section Bottom.
+
+  Context {Σ_funcs : funcs_signature}.
+  Context {Σ_preds : preds_signature}.
+
+  Locate subst_term.
+
+ (* Lemma universal_interp_eval u rho t :
+    eval rho t= t`[rho].
+  Proof.
+    now induction t; cbn. 
+  Qed.
+*)
+  Instance model_bot : interp term :=
+    {| i_func := func; i_atom := fun P v => False|}.
+
+ Section Contexts.
+
+  Print Vector.map.
+(*
+  Fixpoint term_in_form (nu : form)(t : term): Prop :=
+    match nu with 
+      | atom P vv => term_in_term ()
+      | falsity => False
+      | bin _ phi psi => term_in_form phi \/ term_in_form psi
+      | quant _ phi =>  term_in_form phi
+      end.
+
+  Fixpoint world_ctx (A : list form)(t : term): Prop :=
+    match A with 
+      | [] => False
+      | [phi] => 
+*)
+    Program Instance K_frm_ctx {ff:falsity_flag} : kframe :=
+      {|
+        domain := term;
+        nodes := list form ;
+        reachable := @incl form ;
+        world := fun u t => True; (* this is wrong, I don't know what to put here*)
+      |}.
+ Qed.
+
+  Program Instance K_ctx {ff: falsity_flag}: @kmodel _ _ K_frm_ctx:=
+    {|
+        I := fun (u: nodes) => model_bot; 
+      |}.
+    (*
+    Next Obligation.
+      admit.
+    Next Obligation.
+      abstr
+      abstract (eauto using seq_Weak).
+    Qed.
+    *)
+        (*k_interp := model_bot ;
+        k_P := fun A P v => sprv A None (atom P v) 
+        
+
+Print FragmentSyntax.frag_operators.
+Print FullSyntax.full_operators.
+
+    Definition F_P {ff} : list (@form _ _ _ ff) -> Prop := 
+        match ff with 
+        | falsity_on => fun (n: list form) => sprv n Some ⊥ (*taken away sprv and Some*)
+        | _ => fun _ => False end.
+
+    Lemma mon_F {ff:falsity_flag} (u v : nodes) : reachable u v -> F_P u -> F_P v.
+    Proof.
+      cbn. unfold F_P. destruct ff; try easy. intros H H1. eapply seq_Weak; [ exact H1| exact H].
+    Qed.
+
+    Notation "rho '⊩⊥(' u , M ')' phi" :=  (@ksat_bot _ _ _ M _ F_P mon_F u rho phi) (at level 20).
+
+
+
+  Program Definition kmodel_bot 
+    (F_P : @nodes _ _ _ M -> Prop)
+    (mon_F : forall u v, reachable u v -> F_P u -> F_P v)
+     : @kmodel Σ_funcs (@Σ_preds_bot Σ_preds) domain := {|
+    nodes := @nodes _ _ _ M ;
+    reachable := @reachable _ _ _ M ;
+    k_interp := interp_bot False (@k_interp _ _ _ M) ;
+    k_P := fun n P => match P with inl _ => fun _ => F_P n | inr P' => @k_P _ _ _ M n P' end
+  |}.
+  Next Obligation. apply reach_refl. Qed.
+  Next Obligation. now apply reach_tran with v. Qed.
+  Next Obligation. destruct P as [|P'].
+    + now apply mon_F with u.
+    + now apply mon_P with u.
+  Qed.
+
+  Definition ksat_bot 
+    {ff : falsity_flag} (F_P : @nodes _ _ _ M -> Prop)
+    (mon_F : forall u v, reachable u v -> F_P u -> F_P v)
+    u (rho : env domain) (phi : form) : Prop 
+    := @ksat _ Σ_preds_bot domain (kmodel_bot mon_F) falsity_off u rho (falsity_to_pred phi).
+  Arguments ksat_bot {_} _ _ _ _.
+
+  Lemma sat_bot_False {ff:falsity_flag} u rho phi
+    (e : forall u v, reachable u v -> False -> False)
+    : @ksat_bot ff (fun _ => False) e u rho phi <-> @ksat _ _ domain M ff u rho phi.
+  Proof.
+    induction phi in rho,u|-*.
+    - easy.
+    - easy.
+    - destruct b0. unfold sat_bot, falsity_to_pred in *. cbn.
+      split; intros H v Hreach H1 %IHphi1; apply IHphi2; now apply H, H1.
+    - destruct q. unfold sat_bot, falsity_to_pred in *. cbn.
+      split; intros H d; apply IHphi, H.
+  Qed.
+
+End Bottom.
+
+*)
 *)
