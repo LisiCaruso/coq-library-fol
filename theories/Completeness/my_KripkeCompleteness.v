@@ -879,6 +879,12 @@ Section Completeness.
 
   Definition c_closed (phi: form):= c_bounded 0 phi.  
 
+  Definition th_c_closed (Gamma: form -> Prop):=
+    (forall psi: form, Gamma psi -> c_closed psi).
+
+  Definition th_c_bounded (n: nat)(Gamma: form -> Prop):=
+    (forall psi: form, Gamma psi -> c_bounded n psi).
+
   Lemma term_c_bound_mon :
     forall (n m: nat)(trm : term), n <= m -> term_c_bounded n trm -> term_c_bounded m trm.
   Proof.
@@ -910,13 +916,14 @@ Section Completeness.
 
   Notation "A <<=C B" := (ctx_incl A B) (at level 20).  
 
-
-    #[local] Hint Unfold consistent ctx_incl : core.
+  #[local] Hint Unfold consistent ctx_incl : core.
     
   Lemma saturation_lemma :
-    forall (n: nat)(Gamma : form -> Prop), (forall psi: form, Gamma psi -> c_bounded n psi)  -> 
-    exists (Delta: form -> Prop), Gamma <<=C Delta /\  n_saturated n Gamma.
+    forall (n: nat)(Gamma : form -> Prop)(phi: form), 
+    th_c_bounded n Gamma -> c_bounded n phi ->  (Gamma ⊢ phi -> False) ->
+    exists (Delta: form -> Prop), (Gamma <<=C Delta /\  n_saturated n Delta /\ ((Delta ⊢ phi) -> False) ).
   Proof.
+    intros.
     admit.
   Admitted.
 
@@ -989,37 +996,50 @@ Section Completeness.
       |}.
 *)
 
-  Definition kmodel_ctx {ff : falsity_flag}(Gamma : form -> Prop) (phi: form)  :=
-    forall (frm:kframe)(M: kmodel)(u: nodes)(rho: nat-> domain), (forall psi: form, Gamma psi -> ksat u rho psi) -> ksat u rho phi.
+  Definition kmodel_ctx (Gamma : form -> Prop) (phi: form)  :=
+    forall (frm:kframe)(M: kmodel)(u: nodes)(rho: nat-> domain), (forall psi: form, Gamma psi -> @ksat _ _ frm M _ u rho psi) -> @ksat _ _ frm M _ u rho phi.
+  
+  Definition kmodel_ctx' (Gamma : @form Σf Σp _ _-> Prop) (phi: @form Σf Σp _ _)  :=
+    forall (frm:kframe)(M: kmodel)(u: nodes)(rho: nat-> domain), (forall psi: @form Σf Σp _ _, Gamma psi -> @ksat Σf Σp frm M _ u rho psi) -> @ksat Σf Σp frm M _ u rho phi.  
+(*
+  estendi 
+  - termini
+  - formule
+  - 
+*)
+  Axiom DNE : forall P:Prop, ((P -> False)-> False) -> P.  
+
+  Lemma der_ax:
+    forall(Gamma: form -> Prop)(phi: form), Gamma phi -> Gamma ⊢ phi.
+  Proof.
+    intros. unfold "⊢".
+    exists [phi].
+    split.
+    * intros. simpl in H0. destruct H0. 
+      rewrite <-H0; eauto.
+      eauto.
+    * eapply Ctx. eauto.
+  Qed.
 
   Lemma classical_strong_completeness : 
-    forall (Gamma: form -> Prop)(phi : form),
+    forall (Gamma : form -> Prop)(phi: form )(n: nat),
+    th_c_bounded n Gamma -> c_bounded n phi ->
     kmodel_ctx Gamma phi -> Gamma ⊢ phi.
   Proof.
+    intros.
+    eapply DNE.
+    intros.
+    specialize (saturation_lemma H H0 H2).
+    intros.
+    destruct H3 as [Delta (H3, (H4, H5))].
+    assert (Delta phi -> False).
+    intros. eapply der_ax in H6. eauto.
+    
+    
+    eapply der_closed del 
+    eapply saturation_lemma.
+
     admit.
   Admitted.
-    
-  
-
-
-
-
-
-
-
-
-
-  Context {frm : kframe}.
-  Context {M : kmodel}. 
-
-    Definition cons A := ~ A ⊢I ⊥.
-    Definition cons_ctx := { A | cons A }.
-    Definition ctx_incl (A B : cons_ctx) := incl (proj1_sig A) (proj1_sig B).
-
-    #[local] Hint Unfold cons cons_ctx ctx_incl : core.
-
-    Notation "A <<=C B" := (ctx_incl A B) (at level 20).
-    Notation "A ⊢SC phi" := ((proj1_sig A) ⊢SE phi) (at level 20).
-    Notation "A ;; psi ⊢sC phi" := ((proj1_sig A) ;; psi ⊢sE phi) (at level 70).
 
 End Completeness.
