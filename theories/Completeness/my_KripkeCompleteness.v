@@ -5,7 +5,8 @@ From FOL Require Import FullSyntax Theories Deduction.FullSequentFacts Deduction
 
 From Undecidability.Synthetic Require Import Definitions DecidabilityFacts EnumerabilityFacts ListEnumerabilityFacts ReducibilityFacts.
 From Undecidability Require Import Shared.ListAutomation Shared.Dec FOL.Deduction.FullND.
-Require Import List Vector Lia.
+Require Import Arith.
+Require Import Nat List Vector Lia.
 Import ListAutomationNotations ListAutomationHints ListAutomationInstances ListAutomationFacts.
 From FOL.Completeness Require Export TarskiCompleteness.
 From FOL.Utils Require Import MPFacts.
@@ -856,6 +857,7 @@ End Example_nonConstantDomain.
 Section Completeness.
    #[local] Existing Instance falsity_on.
   Context {Σf : funcs_signature} {Σp : preds_signature}.
+
   Instance C_Σf: funcs_signature :=
     {|
       syms := sum (syms)  (nat*nat);
@@ -863,23 +865,6 @@ Section Completeness.
                 | inl f => ar_syms f
                 | inr (_, _) => 0 end)
     |}.
- 
-Print term.
-
-  Definition is_bounded_C (n : nat)(f: syms): Prop :=
-  match f with 
-  | inl _ => False
-  | inr (m, c) => m < n
-  end. 
-
-  Definition is_not_C (f: syms):Prop :=
-  match f with 
-  | inl _ => True
-  | inr _ => False
-  end.
-
-  Definition is_C (f: syms): Prop :=
-  exists n, is_bounded_C n f.
 
   Inductive term_c_bounded : nat-> term -> Prop :=
   | bounded_var : forall (n x : nat), term_c_bounded n (var x)
@@ -892,8 +877,18 @@ Print term.
   | bounded_bin: forall (n: nat)(phi psi: form)(conn : full_logic_sym), (c_bounded n phi) ->(c_bounded n psi) -> c_bounded n (bin conn phi psi)
   | bounded_quant: forall (n: nat)(phi: form)(q : full_logic_quant), (c_bounded n phi) -> c_bounded n (quant q phi).
 
-  Definition c_closed (phi: form):= c_bounded 0 phi.
+  Definition c_closed (phi: form):= c_bounded 0 phi.  
 
+  Lemma term_c_bound_mon :
+    forall (n m: nat)(trm : term), n <= m -> term_c_bounded n trm -> term_c_bounded m trm.
+  Proof.
+    intros.
+    induction H0.
+    * eauto using bounded_var.
+    * eapply bounded_c. eapply (Nat.lt_le_trans k n m); eauto.
+    * eapply bounded_f. intros. eapply H1; eauto.
+  Qed.  
+    
   Definition prv_inf (Gamma : form -> Prop)(phi: form) :=
     exists (Gamma_fin : list form), (forall (psi:form), List.In psi Gamma_fin -> Gamma psi) /\ Gamma_fin ⊢I phi.
     
@@ -901,17 +896,22 @@ Print term.
 
   Definition consistent A := ~ (A ⊢ ⊥).  
 
-  Definition n_saturated (n : nat)(Gamma : form -> Prop): Prop :=
-    consistent Gamma /\ 
-    (forall phi: form, Gamma phi -> c_bounded (n+1) phi) /\
-    (forall phi: form, Gamma ⊢ phi <-> Gamma phi) /\ 
-    (forall phi psi: form, Gamma ⊢ (bin Disj phi psi) -> ((Gamma phi) \/ (Gamma psi))) /\
-    (forall phi: form, Gamma ⊢ (quant Ex phi) -> exists m c : nat, m<n /\ Gamma (phi[(func (inr (m, c)) (nil _) )..])).
+   Class n_saturated (n:nat)(Gamma: form -> Prop) :=
+      { 
+        consist        : consistent Gamma;
+        c_bound phi    : Gamma phi -> c_bounded (n+1) phi;
+        der_closed phi : Gamma ⊢ phi -> Gamma phi;
+        prime phi psi  : Gamma ⊢ (bin Disj phi psi) -> ((Gamma phi) \/ (Gamma psi));
+        ex_closed phi  : Gamma ⊢ (quant Ex phi) -> exists m c, m<=n /\ Gamma (phi[(func (inr (m, c)) (nil _) )..]);
+      }.
 
   Definition ctx_incl (Gamma Delta : form -> Prop) :=
     forall phi: form, Gamma phi -> Delta phi. 
 
   Notation "A <<=C B" := (ctx_incl A B) (at level 20).  
+
+
+    #[local] Hint Unfold consistent ctx_incl : core.
     
   Lemma saturation_lemma :
     forall (n: nat)(Gamma : form -> Prop), (forall psi: form, Gamma psi -> c_bounded n psi)  -> 
@@ -920,42 +920,74 @@ Print term.
     admit.
   Admitted.
 
- (** Definition canonical_model : Type . *)
-  Definition saturated (Gamma : form -> Prop): Prop := exists n, n_saturated n Gamma.
+  Definition canonical_nodes := { G_n :  (form -> Prop)*nat | let (Gamma, n) := G_n in n_saturated n Gamma }.
 
-  Inductive can_nodes' (n: nat)(Gamma: form -> Prop): Prop :=
-  intro n : forall (Gamma: form -> Prop), saturated Gamma -> can_nodes' n Gamma.
+  Definition c_n_set: canonical_nodes -> (form -> Prop) := 
+    fun (G_n : canonical_nodes) => let (G_n, H):= G_n  in
+                                   let (Gamma, n) := G_n in Gamma.
 
-  Definition can_nodes : Type := { Gamma| saturated Gamma }.
+  Definition c_n_nat: canonical_nodes -> nat := 
+    fun (G_n : canonical_nodes) => let (G_n, H):= G_n  in
+                                   let (Gamma, n) := G_n in n.   
+                                   
+  Definition c_incl (Gamma Delta: canonical_nodes): Prop :=
+    ctx_incl (c_n_set Gamma) (c_n_set Delta) /\ (c_n_nat Gamma <= c_n_nat Delta).
 
-  Definition can_index (Gamma : can_nodes): nat.
-  Proof.
-    unfold can_nodes in Gamma.
-    unfold saturated in Gamma.
-    destruct Gamma as 
-  
-
-
-  Definition can_world (Gamma: can_nodes)(trm : term): Prop :=
-    term_c_bounded (proj2_sig Gamma) trm .
+  Definition in_c_world (Gamma: canonical_nodes) (j: term): Prop :=
+    term_c_bounded ((c_n_nat Gamma)+1) j.
 
   Program Instance canonical_model_frm : kframe :=
       {|
         domain := term;
-        nodes := sat_worlds;
-        reachable := ctx_incl;
-        world := sat_worlds -> term;
+        nodes := canonical_nodes;
+        reachable := c_incl;
+        world := in_c_world;
       |}.
     Next Obligation.
-      induction u0; simpl; tauto.
+      unfold c_incl.
+      split; eauto.
     Qed.
     Next Obligation.
-      induction u0; induction v0; induction w; eauto.
+      unfold c_incl in *.
+      split. destruct H. destruct H0. all: eauto.
+      transitivity (c_n_nat v0); now eauto using H, H0.
     Qed.
     Next Obligation.
-      induction u0; induction v0; induction x; eauto.
-    Qed.
+      unfold c_incl in H; destruct H as (H1, H2).
+      unfold in_c_world in *.
+      dependent induction H0.
+       * eauto using bounded_var.
+       * eapply bounded_c. eauto.
+         eapply Nat.lt_le_trans.
+         eapply H. 
+         repeat rewrite Nat.add_1_r.
+         rewrite <- Nat.succ_le_mono; eauto.
+       * eapply bounded_f. intros. eapply term_c_bound_mon.
+         2: eapply H; eauto. 
+         repeat rewrite Nat.add_1_r.
+         rewrite <- Nat.succ_le_mono; eauto.
+  Qed.
+(*
+  Instance can_I : @interp C_Σf Σp  :=
+      {| 
+        i_func := fun _ _ => a;  (*??????*)
+        
+        i_atom := fun Gamma P vv => A ⊢ phi
+      |}.
 
+ #[refine] Instance canonical_model: @kmodel _ _ canonical_model_frm :=
+    {|
+        fun A P v => sprv A None (atom P v) ;
+    |}.
+
+    Program Instance K_ctx {ff:falsity_flag} : kmodel term :=
+      {|
+        nodes := list form ;
+        reachable := @incl form ;
+        k_interp := model_bot ;
+        k_P := fun A P v => sprv A None (atom P v) ;
+      |}.
+*)
 
   Definition kmodel_ctx {ff : falsity_flag}(Gamma : form -> Prop) (phi: form)  :=
     forall (frm:kframe)(M: kmodel)(u: nodes)(rho: nat-> domain), (forall psi: form, Gamma psi -> ksat u rho psi) -> ksat u rho phi.
