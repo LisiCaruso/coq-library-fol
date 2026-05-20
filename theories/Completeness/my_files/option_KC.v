@@ -1,4 +1,9 @@
-(** ** Kripke Completeness **)
+(** ** Kripke Completeness 
+
+TRYING TO USE OPTION TYPE FOR INTERPRETATIONS TO BE ABLE TO ADD CONSTANTS
+
+Require Import Ltac2.Option.
+**)
 
 From FOL Require Import FullSyntax Theories Deduction.FullSequentFacts Deduction.FragmentSequentFacts.
 
@@ -6,6 +11,7 @@ From FOL Require Import FullSyntax Theories Deduction.FullSequentFacts Deduction
 From Undecidability.Synthetic Require Import Definitions DecidabilityFacts EnumerabilityFacts ListEnumerabilityFacts ReducibilityFacts.
 From Undecidability Require Import Shared.ListAutomation Shared.Dec FOL.Deduction.FullND.
 Require Import Arith.
+Require Import Ltac2.Option.
 Require Import Nat List Vector Lia.
 Import ListAutomationNotations ListAutomationHints ListAutomationInstances ListAutomationFacts.
 From FOL.Completeness Require Export TarskiCompleteness.
@@ -47,12 +53,66 @@ Section VariableDomainKripke.
     unfold in_dom.
     eauto using monotone.
   Qed. 
+(*se
+  Lemma forall_empty :
+  forall x: Empty_set, False.
+  Proof.
+  intros. induction x.
+  Qed.
+ c'è almeno un None nel vettore, allora l'applicazione è none
+
+se ar_syms => 1 e se sono tutti Some nel vettore allora allora l'applicazione è some 
+
+Ltac2 is_some (a : 'a option) :=
+  match a with
+  | Some _ => true
+  | None => false
+  end.
+
+Ltac2 is_none (a : 'a option) :=
+  match a with
+  | Some _ => false
+  | None => true
+  end.
+  
+  *)
+
+Definition is_some {A: Type} (a : option A) :=
+  match a with
+  | Some _ => True
+  | None => False
+  end.
+
+Definition is_none {A: Type} (a : option A):=
+  match a with
+  | Some _ => False
+  | None => True
+  end.
+
+
+
+
+Definition vec_all_some {A: Type}{n: nat}(vv : t (option A) n):=
+  Forall (is_some) vv.
+  
+Definition none_in_vec {A: Type}{n: nat}(vv : t (option A) n):=
+  Exists (is_none) vv. 
+
+(*IL SEGUENTE é SBAGLIATO, DEVO RIPARTIRE DA COME SI COSTRUISCONO I TERMINI GRRRR
+  Fixpoint eval (rho : env domain) (t : option term) : option domain :=
+      match t with
+      | None => None
+      | Some (var s) => Some (rho s)
+      | Some (func f vv) => if (Forall (is_some) (Vector.map (eval rho) vv)) then i_func (Vector.map (eval rho) vv)
+                     else None
+      end.
+*)
 
   Class kmodel := {
         I : nodes -> interp domain;
         
-        mon_f (u v:nodes) (f: syms) (vv: (t domain (ar_syms f))) (reach : reachable u v): 
-          in_dom u vv -> i_func (I u) f vv = i_func (I v) f vv;
+        mon_f (u v:nodes) (f: syms) (vv: (t domain (ar_syms f))) (reach : reachable u v) (a : in_dom u vv): 
+           i_func (I u) f vv = i_func (I v) f vv;
 
         k_f_wellDef u f vv (vv_in_dom : (in_dom u vv)): world u (i_func (I u) f vv) (*/\  in_dom u vv*);
 
@@ -858,14 +918,12 @@ Section Completeness.
    #[local] Existing Instance falsity_on.
   Context {Σf : funcs_signature} {Σp : preds_signature}.
 
-  Print term.
-
   Instance C_Σf: funcs_signature :=
     {|
       syms := sum (syms)  (nat*nat);
       ar_syms := fun f => (match f with 
                 | inl f => ar_syms f
-                | inr (_, _) => 1 end)
+                | inr (_, _) => 0 end)
     |}.
 
   Inductive term_c_bounded : nat-> term -> Prop :=

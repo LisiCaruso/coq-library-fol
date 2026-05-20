@@ -1,4 +1,7 @@
-(** ** Kripke Completeness **)
+(** ** Kripke Completeness
+
+  I AM REWRITING THE TERMS, SO THAT I CAN GIVE A NEW TYPE FOR THE COSNTANTS, SUCH THAT EACH COSNTANT 
+  TAKES AN ARGUMENT AND IS ONLY DEFINED IF THE ARGUMENT IS a True Prop**)
 
 From FOL Require Import FullSyntax Theories Deduction.FullSequentFacts Deduction.FragmentSequentFacts.
 
@@ -14,14 +17,11 @@ Require Import Coq.Program.Equality.
 
 Require Import Undecidability.FOL.Semantics.Tarski.FullCore.
 
+
+
 (* ** Universal Models *)
 Section VariableDomainKripke.
-  Context {Σ_funcs : funcs_signature}.
-  Context {Σ_preds : preds_signature}.
-  
-  Arguments eval {_ _ _} _ _ _.
-  Arguments i_atom {_ _ _} _ _.
-  Arguments i_func {_ _ _} _ _.
+  Print preds_signature.
 
   (*Variable domain : Type.*)
   Class kframe :=
@@ -36,7 +36,42 @@ Section VariableDomainKripke.
 
         monotone u v : reachable u v ->  forall x:domain, world u x ->  world v x ;
       }.
+
   Context {frm : kframe}.
+
+  Class cst_signature :=
+  { cst : Type; cst_in : cst -> nodes -> Prop  }.
+
+  Coercion cst : cst_signature >-> Sortclass.
+
+  Context {Σ_funcs : funcs_signature}.
+  Context {Σ_preds : preds_signature}.
+  Context {Σ_const : cst_signature}.
+
+  Inductive k_term : Type :=
+    | var   : nat -> k_term
+    | func  : forall f : Σ_funcs, t term (ar_syms f) -> k_term
+    | con   : forall (c : Σ_const)(u: nodes), (cst_in c u) -> k_term.
+
+  Class k_interp :=  
+      {
+        i_func : forall f : syms, t domain (ar_syms f) -> domain ;
+        i_atom : forall P : preds, t domain (ar_preds P) -> Prop ;
+        i_cst  : forall (c : cst)(u : nodes), (cst_in c u) -> domain;
+      }.
+
+    Definition env := nat -> domain.
+
+    Fixpoint k_eval (u: nodes)(I : k_interp)(rho : env) (t : k_term) : domain :=
+      match t with
+      | var s => rho s
+      | @func f vv => i_func (Vector.map (eval rho) vv)
+      | @con u c c_in_u => i_cst c_in_u
+      end.
+
+  Arguments eval {_ _ _} _ _ _.
+  Arguments i_atom {_ _ _} _ _.
+  Arguments i_func {_ _ _} _ _.
 
   Definition in_dom (u : nodes) (n : nat) (vv: (t _ n)): Prop :=
     forall x, In x vv -> (world u) x.
@@ -49,7 +84,7 @@ Section VariableDomainKripke.
   Qed. 
 
   Class kmodel := {
-        I : nodes -> interp domain;
+        I : forall (u: nodes), interp domain u;
         
         mon_f (u v:nodes) (f: syms) (vv: (t domain (ar_syms f))) (reach : reachable u v): 
           in_dom u vv -> i_func (I u) f vv = i_func (I v) f vv;
