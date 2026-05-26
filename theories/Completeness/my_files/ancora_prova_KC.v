@@ -336,8 +336,7 @@ End KripkeSat.
   Notation "rho '⊩(' u , M ')' phi" := (@ksat _ _ _ M _ u rho phi) (at level 20).
 
 
-Section 
-ness.
+Section Soundness.
   Context {Σf : funcs_signature} {Σp : preds_signature}.
   (* #[local] Existing Instance falsity_on.*)
 
@@ -425,8 +424,7 @@ Qed.
 
 Arguments prv {_ _ _} _.
 
-Lemma 
-ness {ff : falsity_flag} (A : list (form ff))(phi: (form ff)):
+Lemma soundness {ff : falsity_flag} (A : list (form ff))(phi: (form ff)):
     prv intu A phi -> kvalid_ctx' A phi.
   Proof.
     unfold kvalid_ctx.
@@ -473,8 +471,7 @@ ness {ff : falsity_flag} (A : list (form ff))(phi: (form ff)):
       [eapply  IHprv2 | eapply IHprv3]; eauto; intros; destruct H4 as [HH1 | HH2]; try rewrite <- HH1; eauto.
   Qed.
 
-End 
-ness.
+End Soundness.
     
 
 
@@ -1271,7 +1268,7 @@ Proof.
        eapply ex_closed in H1.
        Unshelve. 2: eapply n_saturated_nodes.
        destruct H1 as (k, (c, (dis, HH1))).
-       Check syms.
+       Check syms
        exists(func (inr (k, c)) (nil _)).
        eapply ExE in HH1.  
 
