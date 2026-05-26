@@ -596,7 +596,7 @@ Section Example_nonConstantDomain.
       |}.
 
     Inductive Preds : Type:=
-    | P : Preds
+    | Pp : Preds
     | Q : Preds.
 
     Instance Σ_preds : preds_signature :=
@@ -657,7 +657,7 @@ Section Example_nonConstantDomain.
         i_func := fun _ _ => a; 
         i_atom := fun pr x => match x with
                               | cons _ a _ (nil _) => match pr with 
-                                                      | P => False
+                                                      | Pp => False
                                                       | Q => True
                                                       end
                               | cons _ b _ (nil _) =>  False
@@ -670,11 +670,11 @@ Section Example_nonConstantDomain.
         i_func := fun _ _ => a; 
         i_atom := fun pr x => match x with
                               | cons _ a _ (nil _) => match pr with 
-                                                      | P => False
+                                                      | Pp => False
                                                       | Q => True
                                                       end
                               | cons _ b _ (nil _) =>  match pr with 
-                                                      | P => True
+                                                      | Pp => True
                                                       | Q => False
                                                       end
                               | _ => False
@@ -775,7 +775,7 @@ Section Example_nonConstantDomain.
       - induction u0; induction v0; simpl; reflexivity.
       - induction u0; simpl; auto.
       - intros.
-        remember P0 as PP.
+        remember P as PP.
         induction PP; induction u0; induction v0; cbn; eauto; unfold in_dom in a0.
         all : dependent destruction vv; destruct h.
         dependent destruction vv.
@@ -783,7 +783,7 @@ Section Example_nonConstantDomain.
         all : dependent destruction vv. eauto.
         all: simpl in H; eauto.
       - unfold in_dom; intros; induction u0; simpl in *; eauto. 
-        dependent destruction vv; induction h; destruct vv; destruct P0; eauto.
+        dependent destruction vv; induction h; destruct vv; destruct P; eauto.
         destruct x; eauto.
         apply In_inv in H0; simpl in H0; destruct H0.
         discriminate H0.
@@ -791,7 +791,7 @@ Section Example_nonConstantDomain.
     Defined.
 
   Definition A (alpha: t term 1): form :=  atom Q alpha.
-  Definition B (alpha: t term 1): form := quant Ex (atom P alpha).
+  Definition B (alpha: t term 1): form := quant Ex (atom Pp alpha).
 
   Definition constant_domain_axiom (alpha : t term 1):  form :=
     bin Impl (quant All (bin Disj (A alpha) (B alpha))) (bin Disj (quant All (A alpha)) (B alpha)).
@@ -853,6 +853,563 @@ Section Example_nonConstantDomain.
   Qed.
 
 End Example_nonConstantDomain.
+
+
+Section Completeness.
+
+  Context {Σf : funcs_signature}.
+  Context {Σp : preds_signature}.
+
+  #[local] Existing Instance falsity_on.
+  Instance C_Σf: funcs_signature :=
+    {|
+      syms := sum (syms)  (nat*nat);
+      ar_syms := fun f => (match f with 
+                | inl f => ar_syms f
+                | inr (_, _) => 0 end)
+    |}.
+
+  Inductive term_c_bounded : nat-> @term C_Σf -> Prop :=
+  | bounded_var : forall (n x : nat), term_c_bounded n (var x)
+  | bounded_c   : forall (n k c: nat), k<n -> term_c_bounded n (@func C_Σf (inr (k, c)) (nil _) )
+  | bounded_f   : forall (n:nat)f (vv: (t term (@ar_syms C_Σf (inl f)))), (forall (trm: term),  InT trm vv -> term_c_bounded n trm) -> term_c_bounded n (@func C_Σf (inl f) vv).
+  
+  Inductive c_bounded : nat -> @form C_Σf _ _ _-> Prop :=
+  | bounded_falsity : forall (n:nat), c_bounded n falsity 
+  | bounded_p : forall (n : nat)(P: preds)(vv: (t term (ar_preds P))), (forall (trm: term),  In trm vv -> term_c_bounded n trm) -> c_bounded n (atom P vv)
+  | bounded_bin: forall (n: nat)(phi psi: @form C_Σf _ _ _)(conn : full_logic_sym), (c_bounded n phi) ->(c_bounded n psi) -> c_bounded n (@bin C_Σf _ _ _  conn phi psi)
+  | bounded_quant: forall (n: nat)(phi: form)(q : full_logic_quant), (c_bounded n phi) -> c_bounded n (@quant C_Σf _ _ _ q phi).
+
+  Lemma c_bound_p_term:
+  forall (n: nat)(P: preds)(vv: (t term (ar_preds P))),
+  c_bounded n (atom P vv) <-> Forall (term_c_bounded n) vv.
+  Proof.
+    intros; split; intros.
+    + dependent induction H.
+      eapply Forall_forall; eapply H.
+    + eapply bounded_p. eapply Forall_forall; eauto.
+  Qed.
+
+  Lemma c_bound_conn:
+  forall (n: nat)(phi psi: @form C_Σf _ _ _)(conn : full_logic_sym),
+    c_bounded n (@bin C_Σf _ _ _  conn phi psi) <-> (c_bounded n phi /\ c_bounded n psi).
+  Proof.
+  intros; split; intros.
+  + dependent destruction H; split; eauto.
+  + destruct H; eapply bounded_bin; eauto.
+  Qed.
+
+  Lemma c_bound_quant:
+  forall (n: nat)(phi: @form C_Σf _ _ _)(q : full_logic_quant),
+    c_bounded n (@quant C_Σf _ _ _ q phi) <-> (c_bounded n phi).
+  Proof.
+  intros; split; intros.
+  + dependent destruction H; eauto.
+  + eapply bounded_quant; eauto.
+  Qed.
+
+  Lemma term_c_bound_mon :
+    forall (n m: nat)(trm : term), n <= m -> term_c_bounded n trm -> term_c_bounded m trm.
+  Proof.
+    intros.
+    induction H0.
+    * eauto using bounded_var.
+    * eapply bounded_c. eapply (Nat.lt_le_trans k n m); eauto.
+    * eapply bounded_f. intros. eapply H1; eauto.
+  Qed.  
+
+  Lemma c_bound_mon :
+    forall (n m: nat)(phi: form),
+    n <= m -> c_bounded n phi -> c_bounded m phi.
+  Proof.
+    intros. induction phi using form_ind_falsity.
+    + eapply bounded_falsity.
+    + dependent destruction H0. eapply bounded_p.
+      intros. eapply term_c_bound_mon; eauto.
+    + dependent destruction H0. eapply bounded_bin; [eapply IHphi1 | eapply IHphi2]; eauto.
+    + dependent destruction H0. eapply bounded_quant ; eauto.
+  Qed.
+
+ (* Lemma c_bound_subst_quant: 
+    forall (n : nat)(phi: form)(rho: nat -> term)(j: term)(q: full_logic_quant),
+    term_c_bounded n j ->
+    c_bounded n ((quant q phi)[rho]) <-> c_bounded n phi[j.:rho].
+  Proof.
+    induction phi using form_ind_falsity; intros; split; intros.
+    * eapply bounded_falsity.
+    * eapply bounded_quant. eapply H0.
+    * eapply bounded_p.    
+      dependent destruction trm.
+      ** intros; eapply bounded_var.
+      ** destruct f; admit. 
+  Admitted.  
+      
+  Definition c_closed (phi: @form C_Σf _ _ _):= c_bounded 0 phi.  
+
+  Definition th_c_closed (Gamma: ( @form C_Σf _ _ _) -> Prop):=
+    (forall (psi: @form C_Σf _ _ _), Gamma psi -> c_closed psi).
+*) 
+  Definition th_c_bounded (n: nat)(Gamma: ( @form C_Σf _ _ _)-> Prop):=
+    (forall psi: form, Gamma psi -> c_bounded n psi).
+
+  Fixpoint term_ext (trm : @term Σf): @term C_Σf :=
+  match trm with 
+  | var n => @var C_Σf n
+  | func f vv => @func  C_Σf (inl f) (map (term_ext) vv)
+  end.
+
+  Fixpoint form_ext (phi: @form Σf Σp _ falsity_on): form C_Σf Σp _ falsity_on:=
+   match phi with
+    | falsity => falsity
+    | @atom _ _ _ falsity_on P vv => @atom C_Σf Σp _ falsity_on P (map term_ext vv) 
+    | @bin _ _ _ falsity_on bb phi psi => @bin C_Σf Σp _ falsity_on bb (form_ext phi) (form_ext psi)
+    | @quant _ _ _ falsity_on qq phi => @quant C_Σf Σp _ falsity_on qq (form_ext phi) 
+  end.
+
+  Definition prv_inf {sigma:  funcs_signature}(Gamma : @form sigma _ _ _  -> Prop)(phi: @form sigma _ _ _ ) :=
+    exists (Gamma_fin : list (@form sigma _ _ _ )), (forall (psi:(@form sigma _ _ _ )), List.In psi Gamma_fin -> Gamma psi) /\ Gamma_fin ⊢I phi.
+
+  Definition prv_inf_ext (Gamma : @form C_Σf _ _ _ -> Prop)(phi: @form Σf _ _ _ ) :=
+    exists (Gamma_fin : list form), (forall (psi:form), List.In psi Gamma_fin -> Gamma psi) /\ Gamma_fin ⊢I (form_ext phi).
+  
+  Notation "A ⊢ phi" := (prv_inf A phi) (at level 55).  
+  Notation "A ⊢* phi" := (prv_inf_ext A phi) (at level 55).
+ 
+  Definition consistent A := ~ (A ⊢* ⊥).  
+
+  Lemma consistent_imp_not_Gamma_bot: 
+  forall (Gamma: form -> Prop),
+  consistent Gamma -> Gamma falsity -> False.
+Proof.
+  intros.
+  unfold consistent in H.
+  unfold prv_inf in H.
+  eapply H.
+  exists [falsity]; split.
+  intros. simpl in H1; destruct H1; [rewrite <- H1 | ]; eauto.
+  eapply Ctx; eauto.
+Qed.
+
+   Class n_saturated (n:nat)(Gamma: @form C_Σf _ _ _  -> Prop) :=
+      { 
+        consist        : consistent Gamma;
+        c_bound phi   : Gamma phi -> c_bounded (n+1) phi;
+        der_closed phi : Gamma ⊢ phi -> Gamma phi;
+        prime phi psi  : Gamma ⊢ (@bin C_Σf Σp _ falsity_on Disj phi psi) -> ((Gamma phi) \/ (Gamma psi));
+        ex_closed phi  : Gamma ⊢ (@quant C_Σf Σp _ falsity_on Ex phi) -> exists m c, m<=n /\ Gamma (phi[(@func C_Σf (inr (m, c)) (nil _) )..]);
+      }.
+
+  Definition ctx_incl (Gamma Delta : @form C_Σf _ _ _  -> Prop) :=
+    forall phi: form, Gamma phi -> Delta phi. 
+
+  Notation "A <<=C B" := (ctx_incl A B) (at level 20).  
+
+  #[local] Hint Unfold consistent ctx_incl : core.
+
+  (*ENUMERATIONS!!!*)
+  Variable enum_disj: nat -> form*form.
+
+  Definition enum_disj_1: nat -> form :=
+    fun n => let  (phi, psi):= enum_disj n in phi.
+  Definition enum_disj_2: nat -> form :=
+    fun n => let  (phi, psi):= enum_disj n in psi.
+
+  Hypothesis H_enum_disj : forall phi psi, forall n, exists m, m>=n /\ 
+                          (phi = enum_disj_1 m /\ psi = enum_disj_2 m).
+
+  Variable enum_ex :  nat -> form.
+  Hypothesis H_enum_ex : forall phi, forall n, exists m, m>=n /\ enum_ex m = (quant Ex phi).
+
+  Definition Even n := exists m, n = 2*m.
+  Definition Odd n := exists m, n = 2*m+1.
+
+  Variable enum_const : nat -> term. (*I NEED TO UNDERSTAND HOW TO DEFINE THIS ENUMERATION!!!!!*)
+
+  Section Union. (*COPIED FROM TARSKI CONSTRUCTIONS, could not use it directly because of the connectives*)
+    Definition econsistent T T' := T' ⊢⊥ -> T ⊢ ⊥.
+    Variable f : nat -> theory.
+    Hypothesis econsistent_f : forall n, econsistent (f n) (f (S n)).
+    Hypothesis f_le : forall m n, m <= n -> f m ⊑ f n.
+
+    Definition union (f : nat -> theory) := fun t => exists n, f n t.
+
+    Lemma union_f phi :
+      union f ⊢ phi -> exists n, f n ⊢ phi.
+    Proof.
+      intros (A & HA1 & HA2). enough (exists n, A ⊏ f n) as [n H] by now exists n, A.
+      clear HA2; induction A.
+      - exists 0; eauto with contains_theory.
+      - destruct IHA as [n Hn]; destruct (HA1 a0) as [m Hm]; eauto with contains_theory.
+        exists (max n m); intros ? []; subst.
+        + eapply f_le; [apply PeanoNat.Nat.le_max_r | eauto with contains_theory]. 
+        + eapply f_le; [apply PeanoNat.Nat.le_max_l | eauto with contains_theory].
+    Qed.
+
+    Lemma union_sub n :
+      f n ⊑ union f.
+    Proof.
+      intros ? ?; exists n; eauto with contains_theory.
+    Qed.
+
+    Lemma union_econsistent :
+      econsistent (f 0) (union f).
+    Proof.
+      intros [n H] % union_f. induction n; unfold econsistent in *; eauto.
+    Qed.
+
+    Lemma union_closed :
+      (forall n, closed_T (f n)) -> closed_T (union f).
+    Proof.
+      intros f_closed phi [m H]. now eapply f_closed with (n := m) (phi := phi).
+    Qed.
+  End Union.
+
+  (**SATURATION LEMMA *)
+  Definition Gamma_succ (G_k : form -> Prop)(k : nat)(A: form): form -> Prop :=
+    fun phi => (G_k phi) \/ (exists n, (k = 2*n) /\ (G_k ⊢ (quant Ex (enum_ex n)) /\ phi = (enum_ex n)[(enum_const k)..]))
+    \/ (exists n, (k = 2*n +1) /\ (G_k ⊢ (bin Disj (enum_disj_1 n) (enum_disj_1 n))) /\ phi = (enum_disj_1 n) /\ 
+        (((extend G_k (enum_disj_1 n))⊢ A ) -> False))
+    \/ (exists n, (k = 2*n +1) /\ (G_k ⊢ (bin Disj (enum_disj_1 n) (enum_disj_1 n))) /\ phi = (enum_disj_2 n) /\ 
+        ((extend G_k (enum_disj_1 n))⊢ A )).
+
+  Fixpoint saturated_from_Gamma_fix (G_0: theory)(A: form)(n: nat) :=
+      match n with
+      | 0 => G_0
+      | S n => Gamma_succ (saturated_from_Gamma_fix G_0 A n) n A
+      end.
+
+  Definition Saturated_from_Gamma (G_0: theory)(A: form):= union (saturated_from_Gamma_fix G_0 A).
+
+  Lemma union_sub' n :
+      forall(G_0: theory)(A: form),
+      (saturated_from_Gamma_fix G_0 A n) <<=C Saturated_from_Gamma (G_0)(A).
+    Proof.
+      intros ? ?; exists n; eauto.
+    Qed.
+
+  Lemma Saturated_from_Gamma_incl_G_0 (G_0: theory)(A: form):
+    G_0 <<=C Saturated_from_Gamma G_0 A.
+  Proof. 
+    apply union_sub' with (n := 0).
+  Qed.
+
+  Lemma Saturated_from_Gamma_incl_mon_S (G_0: theory)(A: form): 
+    forall (n : nat),
+      saturated_from_Gamma_fix G_0 A n <<=C saturated_from_Gamma_fix G_0 A (S n).
+  Proof.
+    intros; unfold "<<=C" in *; intros; eauto.
+    simpl in *. unfold Gamma_succ. left. eauto.
+  Qed.
+
+  Lemma Saturated_from_Gamma_incl_mon (G_0: theory)(A: form): 
+    forall (n m : nat),
+      n <=m -> saturated_from_Gamma_fix G_0 A n <<=C saturated_from_Gamma_fix G_0 A m.
+  Proof.
+    intros n m ll.
+    assert (exists k, m = n+k).
+    pose proof( Nat.le_exists_sub n m ll).
+    destruct H as (k , (H, HH)).
+    exists k; erewrite Nat.add_comm; eapply H.
+    destruct H as (k , H).
+    rewrite H. induction m.
+    * eapply Arith_base.le_n_0_eq_stt in ll. erewrite <- ll in *.
+      erewrite <- H in *.  simpl in *. eauto.
+    * admit.
+      (*
+      erewrite <- H.
+      transitivity (saturated_from_Gamma_fix G_0 A (m)).
+      2 : eapply Saturated_from_Gamma_incl_mon_S.
+
+    erewrite <- plus_n_O. eauto. 
+    * erewrite <- plus_n_Sm. 
+      transitivity (saturated_from_Gamma_fix G_0 A (n + k)).
+      eapply IHk.
+    
+    eapply Saturated_from_Gamma_incl_mon_S. Search "+". 
+    
+    
+    
+    simpl in *.
+    Search le.
+    intros; unfold "<<=C" in *; intros; eauto.
+    simpl in *. unfold Gamma_succ. left. eauto.
+    *)
+  Admitted.
+
+
+
+  Lemma union_f' phi :
+    forall(G_0: theory)(A: form),
+    (Saturated_from_Gamma G_0 A) ⊢ phi -> exists n, (saturated_from_Gamma_fix G_0 A n) ⊢ phi.
+    Proof.
+      intros. eapply union_f. 2: eapply H.
+      induction m, n; intros; unfold "⊑"; unfold "∈" in *; intros; eauto.
+      * simpl in H1. simpl. unfold Gamma_succ.
+    Qed.
+
+
+  Lemma Saturated_from_Gamma_cons (G_0: theory)(A: form):
+    ((Saturated_from_Gamma G_0 A  ⊢ A) -> False).
+  Proof.
+    intros [n H] % union_f.
+  
+  Lemma saturation_lemma :
+    forall (n: nat)(Gamma : form -> Prop)(phi: form), 
+    th_c_bounded n Gamma -> c_bounded n phi ->  (Gamma ⊢ phi -> False) ->
+    exists (Delta: form -> Prop), (Gamma <<=C Delta /\  n_saturated n Delta /\ ((Delta ⊢ phi) -> False) ).
+  Proof.
+    intros.
+    admit.
+  Admitted.
+
+(*CANONICAL FRAME*)
+  Definition canonical_nodes := { G_n :  (@form C_Σf _ _ _  -> Prop)*nat | let (Gamma, n) := G_n in 
+   n_saturated n Gamma }.
+
+  Definition c_n_set: canonical_nodes -> ( @form C_Σf _ _ _  -> Prop) := 
+    fun (G_n : canonical_nodes) => let (G_n, H):= G_n  in
+                                   let (Gamma, n) := G_n in Gamma.
+
+  Definition c_n_nat: canonical_nodes -> nat := 
+    fun (G_n : canonical_nodes) => let (G_n, H):= G_n  in
+                                   let (Gamma, n) := G_n in n.   
+                                   
+  Definition c_incl (Gamma Delta: canonical_nodes): Prop :=
+    ctx_incl (c_n_set Gamma) (c_n_set Delta) /\ (c_n_nat Gamma <= c_n_nat Delta).
+
+  Definition in_c_world (Gamma: canonical_nodes) (j: @term C_Σf): Prop :=
+    term_c_bounded ((c_n_nat Gamma)) j.
+
+  Lemma consistent_canonical_set (G_n: canonical_nodes):
+    consistent (c_n_set G_n).
+  Proof.
+    destruct G_n as ((Gamma, n), satu). simpl. eauto using consist.
+  Qed.
+
+  Lemma iff_der_closed: 
+    forall (G_n : canonical_nodes)(phi: form), 
+    (c_n_set G_n) ⊢ phi <-> (c_n_set G_n) phi.
+  Proof.
+    intros; split; intros.
+    destruct G_n as ((Gamma, n), satu).
+    + eapply der_closed; eauto.
+    + unfold "⊢"; exists [phi]; split.
+      ++ intros; simpl in H0; destruct H0; [rewrite <- H0|]; eauto.
+      ++ eapply Ctx; eauto.
+  Qed.
+
+  Lemma n_saturated_nodes: 
+    forall (G_n : canonical_nodes),
+    
+    n_saturated (c_n_nat G_n) (c_n_set G_n).
+  Proof.
+    intros.
+    destruct G_n as ((Gamma, n), A). simpl.
+    eauto.
+  Qed.
+
+  Program Instance canonical_model_frm : kframe :=
+      {|
+        domain := (@term C_Σf);
+        nodes := canonical_nodes;
+        reachable := c_incl;
+        world := in_c_world;
+      |}.
+    Next Obligation.
+      unfold c_incl.
+      split; eauto.
+    Qed.
+    Next Obligation.
+      unfold c_incl in *.
+      split. destruct H. destruct H0. all: eauto.
+      transitivity (c_n_nat v0); now eauto using H, H0.
+    Qed.
+    Next Obligation.
+      unfold c_incl in H; destruct H as (H1, H2).
+      unfold in_c_world in *.
+      dependent induction H0.
+       * eauto using bounded_var.
+       * eapply bounded_c. eauto.
+         eapply Nat.lt_le_trans.
+         eapply H.
+         eapply H2. 
+       * eapply bounded_f. intros. eapply term_c_bound_mon.
+         2: eapply H. all: eauto. 
+  Qed.
+
+  Fixpoint saturated_from_Gamma (Gamma: theory) (n: nat) :=
+      match n with
+      | 0 => 0
+      | S n => if (exists m, S n = 2*m) then 3 else 4
+      end.
+      
+      exp n ⋄ exp_axiom (e n)
+      end.
+    Definition Exp := union exp.
+
+Existing Instance Σf.
+Check i_func.
+Definition I_Gamma (Gamma: canonical_nodes): interp (@term C_Σf):=
+{|
+  i_func := fun (f: Σf) vv => (@func Σf f vv);
+  i_atom := fun P vv =>  (prv_inf (c_n_set Gamma) (form_ext (atom P vv)));
+|}.
+
+
+
+#[refine] Instance canonical_model : (@kmodel Σf Σp canonical_model_frm) := 
+{|
+   I:= fun Gamma =>  I_Gamma Gamma
+|}.
+
+
+ Program Instance K_ctx {ff:falsity_flag} : kmodel term :=
+      {|
+        nodes := list form ;
+        reachable := @incl form ;
+        k_interp := model_bot ;
+        k_P := fun A P v => sprv A None (atom P v) ;
+      |}.
+
+(*
+  Lemma canonical_model_construction':
+  forall (G_n: nodes)(rho : nat -> term)(P: preds)(vv: t term (ar_preds P)), 
+    (forall trm: term, InT trm vv -> term_c_bounded (c_n_nat G_n) (@eval _ _ _ rho trm)) -> 
+    ((c_n_set G_n) (atom P vv)[rho]) <-> (ksat G_n rho (atom P vv)).
+Admitted.
+*)
+
+  Lemma canonical_model_construction:
+  forall (G_n: nodes)(P: preds)(vv: t term (ar_preds P)), 
+    (forall trm: term, InT trm vv -> term_c_bounded (c_n_nat G_n) trm) -> 
+    ((c_n_set G_n) (atom P vv)) <-> (ksat G_n (fun x => $x) (atom P vv)).
+Admitted.
+
+  Lemma canonical_model_subst: 
+  forall (G_n: nodes)(P: preds)(rho: nat -> term)(vv: t term (ar_preds P)), 
+    ((c_n_set G_n) (atom P vv)[rho]) <-> (ksat G_n rho (atom P vv)).
+  Proof.
+    intros; split; intros.
+  Admitted.
+
+
+  Theorem WeakI A B phi :
+    A ⊢I phi -> A <<= B -> B ⊢I phi.
+  Proof.
+    intros H. revert B.
+    induction H; intros B HB; try unshelve (solve [econstructor; auto with datatypes]); try now econstructor.
+  Qed.
+
+  Theorem Impl_inv A phi psi:
+    (A ⊢I phi → psi -> False) <-> ((phi :: A) ⊢I psi -> False).
+  Proof.
+    split; intros.
+    eapply H. eapply II; eauto.
+    pose proof (@WeakI A (phi::A) (phi → psi)).
+    assert (A <<= phi :: A). eauto.
+    specialize (H1 H0 H2). 
+    assert ( (phi :: A) ⊢I phi). eapply Ctx; eauto.
+    assert ((phi :: A) ⊢I psi).
+    eapply IE; eauto.
+    eauto.
+  Qed.
+      
+Axiom DNE : forall P:Prop, ((P -> False)-> False) -> P.  
+
+Axiom EM:  forall (A: Prop), A \/ (A -> False).
+
+Lemma truth_lemma_rho':
+  forall (G_n : nodes)(phi: form)(rho : nat -> term),
+  c_bounded (c_n_nat G_n) phi[rho]-> 
+  ((c_n_set G_n) phi[rho]) <-> (ksat G_n rho phi).
+Proof.
+  intros G_n phi; revert G_n.
+  apply (form_ind_falsity (P:= fun phi => forall G_n  (rho : nat -> term),
+    c_bounded (c_n_nat G_n) phi [rho] ->
+    c_n_set G_n phi [rho] <-> rho ⊩( G_n, canonical_model) phi)); 
+  intros; split; intros (*simpl*).    
+  + simpl; eapply consistent_imp_not_Gamma_bot. 2: eapply H0.
+    eapply consistent_canonical_set.
+  + simpl; simpl in H0; eauto.
+  + eapply canonical_model_subst; eauto.
+    (*eapply (c_bound_p_term); eauto.*)
+  + eapply canonical_model_subst; eauto.
+    (*eapply (c_bound_p_term); eauto.*)
+  + simpl; eapply iff_der_closed in H2.
+    pose proof (c_bound_conn (c_n_nat G_n)  f1[rho] f2[rho]).
+    destruct b0.    
+    ++ unfold "⊢" in H2.
+      destruct H2 as (Delta, (Delta_sub, HH)).
+      specialize (H3 Conj); eapply H3 in H1; destruct H1 as (cb1, cb2).
+      split; 
+      [eapply CE1 in HH; eapply H | eapply CE2 in HH; eapply H0]; eauto; 
+      erewrite <- iff_der_closed; exists Delta; split; eauto.
+    ++ specialize (H3 Disj); eapply H3 in H1; destruct H1 as (cb1, cb2).
+       eapply prime in H2. destruct H2; [left; eapply H | right; eapply H0]; eauto.
+       Unshelve. exact (c_n_nat G_n).
+       unfold canonical_nodes in G_n. eapply n_saturated_nodes.
+    ++ specialize (H3 Impl); eapply H3 in H1; destruct H1 as (cb1, cb2).
+       intros Gamma1 inclusion Hf1.
+       destruct inclusion.
+       assert (c_bounded (c_n_nat Gamma1) f1[rho]). eapply c_bound_mon; eauto.
+       assert (c_bounded (c_n_nat Gamma1) f2[rho]). eapply c_bound_mon; eauto.
+       specialize (H Gamma1 rho H5). eapply H in Hf1.
+       eapply H0. eapply H6.
+       assert ( c_n_set Gamma1 ⊢ f1[rho]).
+       unfold "⊢" . exists [f1[rho]]; split.
+       intros. simpl in H7; destruct H7; [rewrite <- H7 | ]; eauto.
+       eapply Ctx; eauto. 
+       unfold "⊢" in H2; destruct H2 as (Delta, (H2, HH2)).
+       unfold "⊢" in H7; destruct H7 as (Delta', (H7, HH7)).
+       assert ((Delta ++ Delta')⊢I f1[rho] → f2[rho]). eapply WeakI; eauto.
+       assert ((Delta ++ Delta')⊢I f1[rho] ).  eapply WeakI; eauto.
+       assert ((Delta ++ Delta')⊢I f2[rho] ). eapply IE; eauto.
+       eapply der_closed. exists (Delta ++ Delta').
+       split; intros; eauto. eapply in_app_iff in H11; destruct H11.
+       * eapply H1; eapply H2; eauto.
+       * eapply H7; eauto.
+       Unshelve. exact (c_n_nat Gamma1).
+       unfold canonical_nodes in Gamma1. eapply n_saturated_nodes.
+  + eapply iff_der_closed. 
+    unfold "⊢". 
+    destruct b0; eapply c_bound_conn in H1; destruct H1 as (cb1, cb2).
+       (*specialize (H _ cb1); specialize (H0 _ cb2); simpl in H0.*)
+    ++ destruct H2 as (H1, H2).
+       eapply H in H1. eapply H0 in H2. all: eauto.
+       eapply iff_der_closed in H1. eapply iff_der_closed in H2.
+       unfold "⊢" in *. 
+       destruct H1 as (D1, (H1, HH1)). destruct H2 as (D2, (H2, HH2)).
+       exists (D1++D2);split.
+       * intros. eapply in_app_iff in H3. destruct H3; [eapply H1 | eapply H2]; eauto.
+       * eapply CI. 
+         assert (D1 <<= (D1 ++D2)); eauto; eapply (WeakI HH1 H3).
+         assert (D2 <<= (D1++D2)); eauto; eapply (WeakI HH2 H3).
+    ++ destruct H2;  [eapply H in H1 | eapply H0 in H1]; eauto; 
+       eapply iff_der_closed in H1;  destruct H1 as (D, (H1, HH)); exists D; split; eauto;
+       [ eapply DI1 | eapply DI2]; eauto.
+    ++  admit. (*
+    GUARDA MEGLIO LA TEORIA!!!!!!!
+. *)
+  + simpl; destruct q.
+    ++ intros. eapply H.
+      *  eapply c_bound_subst_quant.
+        eapply H3.
+        eapply c_bound_mon. 2: eapply H0.
+        eapply H2.
+      * eapply iff_der_closed in H1.
+        destruct H1 as (D, (H1, HH1)).
+        eapply iff_der_closed.
+        exists D; split.
+        ** intros. eapply H2. eapply H1; eauto.
+        ** admit.
+    ++ eapply iff_der_closed in H1.
+       eapply ex_closed in H1.
+       Unshelve. 2: eapply n_saturated_nodes.
+       destruct H1 as (k, (c, (dis, HH1))).
+       Check syms
+       exists(func (inr (k, c)) (nil _)).
+       eapply ExE in HH1.  
+
 
 Section Completeness.
    #[local] Existing Instance falsity_on.
