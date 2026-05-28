@@ -230,7 +230,6 @@ Section KripkeSat.
         apply (mon_P R). 
           ++ erewrite <- map_eval_vv; eauto. (* eauto using in_dom_mix. k_P_wellDef
                     ++ erewrite <- map_eval_vv; eauto. *) 
-
       * destruct b0.
         + destruct H; split; eauto.
         + destruct H; [left | right]; eauto. 
@@ -1132,7 +1131,12 @@ Qed.
          2: eapply H. all: eauto. 
   Qed.
 
-  Context {canonical_model : @kmodel C_Σf Σp canonical_model_frm}.
+
+Instance canonical_model : @kmodel Σf Σp canonical_model_frm.
+{|
+
+|}
+
 (*
   Lemma canonical_model_construction':
   forall (G_n: nodes)(rho : nat -> term)(P: preds)(vv: t term (ar_preds P)), 
