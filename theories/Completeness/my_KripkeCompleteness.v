@@ -926,25 +926,232 @@ Section Completeness.
   Definition th_c_bounded (n: nat)(Gamma: ( @form C_Σf _ _ _)-> Prop):=
     (forall psi: form, Gamma psi -> c_bounded n psi).
 
-  Fixpoint term_ext (trm : @term Σf): @term C_Σf :=
-  match trm with 
-  | var n => @var C_Σf n
-  | func f vv => @func  C_Σf (inl f) (map (term_ext) vv)
-  end.
+(* -------------------------------------------------------------------------------------- *)
+Section Translations_Σf_C_Σf.
 
-  Fixpoint form_ext (phi: @form Σf Σp _ falsity_on): form C_Σf Σp _ falsity_on:=
-   match phi with
-    | falsity => falsity
-    | @atom _ _ _ falsity_on P vv => @atom C_Σf Σp _ falsity_on P (map term_ext vv) 
-    | @bin _ _ _ falsity_on bb phi psi => @bin C_Σf Σp _ falsity_on bb (form_ext phi) (form_ext psi)
-    | @quant _ _ _ falsity_on qq phi => @quant C_Σf Σp _ falsity_on qq (form_ext phi) 
-  end.
+Fixpoint term_to_C_Σf_term (trm : @term Σf): @term C_Σf :=
+match trm with 
+| var n => @var C_Σf n
+| func f vv => @func  C_Σf (inl f) (map (term_to_C_Σf_term) vv)
+end.
+
+Fixpoint form_to_C_Σf_form (phi: @form Σf Σp _ falsity_on): form C_Σf Σp _ falsity_on:=
+  match phi with
+  | falsity => falsity
+  | @atom _ _ _ falsity_on P vv => @atom C_Σf Σp _ falsity_on P (map term_to_C_Σf_term vv) 
+  | @bin _ _ _ falsity_on bb phi psi => @bin C_Σf Σp _ falsity_on bb (form_to_C_Σf_form phi) (form_to_C_Σf_form psi)
+  | @quant _ _ _ falsity_on qq phi => @quant C_Σf Σp _ falsity_on qq (form_to_C_Σf_form phi) 
+end.
+
+Fixpoint C_closed_term_to_Σf_term (t: @term C_Σf) : @term Σf.
+Proof.
+  refine (match t with 
+  | @var _ n => @var Σf n
+  | @func _ (inl f) vv => @func Σf f (map C_closed_term_to_Σf_term vv)
+  | @func _ (inr f) vv =>  @var Σf 0
+  end).
+Qed.
+
+Fixpoint C_closed_form_to_Σf_form (phi: @form C_Σf Σp _ falsity_on) : @form Σf Σp _ falsity_on.
+Proof.
+  refine (match phi with 
+  | falsity => falsity
+  | @atom _ _ _ falsity_on P vv => @atom Σf Σp _ falsity_on P (map C_closed_term_to_Σf_term vv) 
+  | @bin _ _ _ falsity_on bb phi psi => @bin Σf Σp _ falsity_on bb (C_closed_form_to_Σf_form phi) (C_closed_form_to_Σf_form psi)
+  | @quant _ _ _ falsity_on qq phi => @quant Σf Σp _ falsity_on qq (C_closed_form_to_Σf_form phi) 
+  end).
+Qed.
+
+Fixpoint term_count_C (trm: @term C_Σf): nat :=
+match trm with 
+|  @var _ n => 0
+|  @func _ (inl f) vv => (fold_left add 0 (map term_count_C vv))
+|  @func _ (inr (k, c)) _  => 1
+end.
+
+Fixpoint form_count_C (phi: @form C_Σf _ _ falsity_on): nat :=
+match phi with
+  | falsity => 0
+  | @atom _ _ _ falsity_on P vv => (fold_left add 0 (map term_count_C vv)) 
+  | @bin _ _ _ falsity_on bb phi psi => (form_count_C phi) + (form_count_C psi)
+  | @quant _ _ _ falsity_on qq phi => (form_count_C phi)
+end.
+
+Fixpoint term_shift_n (n: nat)(trm: @term C_Σf):=
+match n with 
+| 0    => trm
+| S n  => term_shift_n n (trm `[↑])
+end.
+
+Fixpoint form_shift_n (n: nat)(phi: @form C_Σf _ _ falsity_on):=
+match n with 
+| 0    => phi
+| S n  => form_shift_n n (phi[↑])
+end.
+
+Definition prepare_form (phi: @form C_Σf _ _ falsity_on) :=
+  form_shift_n (form_count_C phi) phi.
+
+#[local] Notation "[ ]" := (nil _) (format "[ ]").
+#[local] Notation "h :: t" := (cons _ h _ t) (at level 60, right associativity).
+
+Definition subst_const_n_var (n: nat)(trm: @term C_Σf): (nat)*(@term C_Σf):=
+match trm with 
+  | @func _ (inr (k, c)) _  => (S n, (@var C_Σf n))
+  |  _ => (n, trm)
+end.
+
+Definition subst_const_n_var' (rho: nat -> @term C_Σf)(n: nat)(trm: @term C_Σf): (nat -> @term C_Σf)*(nat)*(@term C_Σf):=
+match trm with 
+  | @func _ (inr (k, c)) (nil _)  => ( (@func _ (inr (k, c)) (nil _)).:rho , S n, (@var C_Σf n))
+  |  _ => (rho, n, trm)
+end.
+
+Definition temp_subst {len : nat}(n_ww : nat * (t (@term C_Σf) len))(trm: (@term C_Σf)): (nat)*(t (@term C_Σf) (S len)) :=
+  let (n, ww ):= n_ww in 
+  let (n', trm_sub) := (subst_const_n_var n trm) in (n', (shiftin trm_sub ww )).
+
+Definition temp_subst' (rho:  nat -> @term C_Σf){len : nat}(n_ww : nat * (t (@term C_Σf) len))(trm: (@term C_Σf)): (nat -> @term C_Σf)*nat*(t (@term C_Σf) (S len)) :=
+  let (n, ww ):= n_ww in 
+  let (n', trm_sub) := (subst_const_n_var' rho n trm) in (n', (shiftin trm_sub ww )).
+
+Fixpoint temp_fold_left_subs {len_ww}(n_ww : nat * (t (@term C_Σf) len_ww)) {len_vv} (vv: t (@term C_Σf) len_vv)
+: nat * t (@term C_Σf) (len_vv + len_ww). 
+Proof. 
+  refine(
+  match vv in t _ mm with
+    | [] => n_ww
+    | aa :: vv => _
+  end).
+  assert (n + S len_ww = S n + len_ww).
+  rewrite Nat.add_succ_comm. reflexivity.
+  rewrite <- H.
+  exact (temp_fold_left_subs (S len_ww) (temp_subst n_ww aa) _ vv).
+Qed.
+
+Fixpoint temp_fold_left_subs' (rho:  nat -> @term C_Σf){len_ww}(n_ww : nat * (t (@term C_Σf) len_ww)) {len_vv} (vv: t (@term C_Σf) len_vv)
+: (nat -> @term C_Σf)*nat* t (@term C_Σf) (len_vv + len_ww). 
+Proof. 
+  refine(   
+  match vv in t _ mm with
+    | [] =>  let (nn, ww):= n_ww in (rho, nn, _)
+    | aa :: vv => let (nn, ww):= n_ww in 
+                  let (rho'_n', ww') := temp_subst' rho n_ww aa in 
+                  let (rho', n') := rho'_n' in _
+  end).
+  exact ww.
+  (* the rfirst ww is ww*)
+  assert (n + S len_ww = S n + len_ww).
+  rewrite Nat.add_succ_comm. reflexivity.
+  rewrite <- H.
+  exact (temp_fold_left_subs'  rho' (S len_ww) (n' , ww') _ vv). 
+Qed.
+
+Definition fold_left_subs {len_vv}(n: nat)(vv: t (@term C_Σf) len_vv) := 
+@temp_fold_left_subs 0 (n,(nil _)) _ vv.
+
+Definition fold_left_subs' {len_vv}(rho:  nat -> @term C_Σf)(n: nat)(vv: t (@term C_Σf) len_vv) := 
+@temp_fold_left_subs' rho 0 (n,(nil _)) _ vv.
+
+Fixpoint C_term_to_C_Σf_closed_term (n: nat)(trm:  @term C_Σf): (nat)*(@term C_Σf).
+Proof.
+  refine( match trm with 
+  |  @var _ m => (n,(@var C_Σf m))
+  |  @func _ (inl f) vv => let (n',vv') := fold_left_subs n vv in 
+                          (n', (@func _ ) (inl f) _)
+  |  @func _ (inr (k, c)) _  =>  subst_const_n_var n trm
+  end  ).
+  all: simpl in *.
+  rewrite plus_n_O.
+  exact vv'.
+Qed.
+
+Fixpoint C_term_to_C_Σf_closed_term' (rho:  nat -> @term C_Σf)(n: nat)(trm:  @term C_Σf): (nat -> @term C_Σf)*(nat)*(@term C_Σf).
+Proof.
+  refine( match trm with 
+  |  @var _ m => (rho, n,(@var C_Σf m))
+  |  @func _ (inl f) vv => let (rho'_n',vv') := fold_left_subs' rho n vv in 
+                           let (rho', n') := rho'_n' in 
+                          (rho', n', (@func _ ) (inl f) _)
+  |  @func _ (inr (k, c)) _  =>  subst_const_n_var' rho n trm
+  end  ).
+  all: simpl in *.
+  rewrite plus_n_O.
+  exact vv'.
+Qed.
+
+Definition C_term_to_Σf_term (n: nat)(trm: @term C_Σf): (@term Σf) :=
+  let (n', trm'):= C_term_to_C_Σf_closed_term n trm in 
+   C_closed_term_to_Σf_term trm'.
+
+Definition C_term_to_Σf_term' (rho:  nat -> @term C_Σf)(n: nat)(trm: @term C_Σf):  (nat -> @term C_Σf)*(@term Σf) :=
+  let (rho'_n', trm'):= C_term_to_C_Σf_closed_term' rho n trm in 
+  let (rho', n') := rho'_n' in (rho', C_closed_term_to_Σf_term trm').
+
+Fixpoint C_form_to_C_Σf_closed_form (n: nat)(phi:  @form C_Σf _ _ _): (nat)*(@form C_Σf _ _ _).
+Proof.
+  refine(  match phi with 
+  |  @falsity _ _ _ => (n, @falsity C_Σf _ _)
+  |  @atom _ _ _ falsity_on P vv => let (n', vv'):= fold_left_subs n vv in
+                                    (n', @atom C_Σf Σp _ falsity_on P _) 
+  |  @bin _ _ _ falsity_on bb phi psi => let (n' , phi'):= (C_form_to_C_Σf_closed_form n  phi) in
+                                        let (n'', psi'):= (C_form_to_C_Σf_closed_form n' phi) in
+                                        (n'', @bin C_Σf Σp _ falsity_on bb phi' psi')
+  | @quant _ _ _ falsity_on qq phi => let (n' , phi'):= (C_form_to_C_Σf_closed_form n  phi) in 
+                                        (n', @quant C_Σf Σp _ falsity_on qq phi') 
+  end).
+  rewrite plus_n_O.
+  exact vv'.
+Qed.
+
+Fixpoint C_form_to_C_Σf_closed_form' (rho:  nat -> @term C_Σf)(n: nat)(phi:  @form C_Σf _ _ _): (nat -> @term C_Σf)*(nat)*(@form C_Σf _ _ _).
+Proof.
+  refine(  match phi with 
+  |  @falsity _ _ _ => (rho, n, @falsity C_Σf _ _)
+  |  @atom _ _ _ falsity_on P vv => let (n', vv'):= fold_left_subs' rho n vv in
+                                    (n', @atom C_Σf Σp _ falsity_on P _) 
+  |  @bin _ _ _ falsity_on bb phi psi => let (rho'_n' , phi'):= (C_form_to_C_Σf_closed_form' rho n  phi) in
+                                         let (rho', n') := rho'_n' in 
+                                         let (n'', psi'):= (C_form_to_C_Σf_closed_form' rho' n' phi) in
+                                        (n'', @bin C_Σf Σp _ falsity_on bb phi' psi')
+  | @quant _ _ _ falsity_on qq phi => let (rho'_n' , phi'):= (C_form_to_C_Σf_closed_form' rho n  phi) in 
+                                      let (rho', n') := rho'_n' in 
+                                      (rho', n', @quant C_Σf Σp _ falsity_on qq phi') 
+  end).
+  rewrite plus_n_O.
+  exact vv'.
+Qed.
+
+Definition C_form_to_Σf_form (phi:  @form C_Σf _ _ _) :=
+  let (n, phi'):= C_form_to_C_Σf_closed_form 0 (prepare_form phi) in 
+  C_closed_form_to_Σf_form phi'.
+
+Definition C_form_to_Σf_form' (rho:  nat -> @term C_Σf)(phi:  @form C_Σf _ _ _) :=
+  let (rho'_n, phi'):= C_form_to_C_Σf_closed_form' rho 0 (prepare_form phi) in 
+  let (rho', n) := rho'_n in 
+  (rho, C_closed_form_to_Σf_form phi').
+
+  (*scan a formula, 
+    count how many constants (count), 
+    shift it up of count 
+    substitute each x with x_i and increase the counter
+    
+    the one wit the prime at the same time build the evaluation rho*)  
+
+Fixpoint C_rho_to_C_Σf_rho (n: nat)(phi:  @form C_Σf _ _ _)(rho: nat ->  @term C_Σf): (nat ->  @term C_Σf).
+???????????????????
+Qed.
+
+
+
+End Translations_Σf_C_Σf.
+
 
   Definition prv_inf {sigma:  funcs_signature}(Gamma : @form sigma _ _ _  -> Prop)(phi: @form sigma _ _ _ ) :=
     exists (Gamma_fin : list (@form sigma _ _ _ )), (forall (psi:(@form sigma _ _ _ )), List.In psi Gamma_fin -> Gamma psi) /\ Gamma_fin ⊢I phi.
 
   Definition prv_inf_ext (Gamma : @form C_Σf _ _ _ -> Prop)(phi: @form Σf _ _ _ ) :=
-    exists (Gamma_fin : list form), (forall (psi:form), List.In psi Gamma_fin -> Gamma psi) /\ Gamma_fin ⊢I (form_ext phi).
+    exists (Gamma_fin : list form), (forall (psi:form), List.In psi Gamma_fin -> Gamma psi) /\ Gamma_fin ⊢I (form_to_C_Σf_form phi).
   
   Notation "A ⊢ phi" := (prv_inf A phi) (at level 55).  
   Notation "A ⊢* phi" := (prv_inf_ext A phi) (at level 55).
@@ -1286,67 +1493,6 @@ Axiom EM:  forall (A: Prop), A \/ (A -> False).
 Search funcomp var S.
 About var.
 
-Fixpoint closed_term_to_Σf_term (t: @term C_Σf) : @term Σf.
-Proof.
-  refine (match t with 
-  | @var _ n => @var Σf n
-  | @func _ (inl f) vv => @func Σf f (map closed_term_to_Σf_term vv)
-  | @func _ (inr f) vv =>  @var Σf 0
-  end).
-Qed.
-
-#[local] Notation "[ ]" := (nil _) (format "[ ]").
-#[local] Notation "h :: t" := (cons _ h _ t) (at level 60, right associativity).
-
-Search map.
-
-Fixpoint C_term_to_Σf_term (t:  @term C_Σf): (@term Σf).
-Proof.
-  refine( match t with 
-  |  @var _ n => @var Σf n
-  |  @func _ (inl f) vv => match vv with
-                          | nil _  => @func Σf f _
-                          | cons _ hd n tl => let trm:= C_term_to_Σf_term hd in 
-                                     (@func Σf f _)
-                          end
-  | @func _ (inr (k, c)) _  => (@var Σf 0)
-  end  ).
-  all: simpl in vv.
-  exact ((map (fun x => C_term_to_Σf_term x) vv)).
-  assert (S n =  (ar_syms f)). admit.
-  rewrite <- H.
-  exact (trm::(map (fun x => C_term_to_Σf_term x) tl)).
-  
-  About subst_var.
-
-
-Fixpoint C_term_to_Σf_term (t:  @term C_Σf)(rho: nat -> @term C_Σf): (@term Σf)*(nat -> (@term C_Σf)).
-Proof.
-  refine(  match t with 
-  |  @var _ n => (@var Σf n, rho)
-  |  @func _ (inl f) vv => match vv with
-                          | [] => (@func Σf f _, rho)
-                          | h::t  => let (trm, sigma) := C_term_to_Σf_term h rho in 
-                                     let (vv_term, )
-                                     (@func Σf f trm::(C_term_to_Σf_term t sigma) 
-                          end
-  | @func _ (inr (k, c)) _  => (@var Σf 0, ((@func _ _ _)  .: rho))
-  end  ).
-  (*
-  (@func Σf f (map (fun x => C_term_to_Σf_term x rho) vv), rho)
-  |  @func _ (inr (k, c)) _  => (@var Σf 0, ((@func _ _ _)  .: rho))
-  end).
-  exact t1.*)
-Qed.
-
-Fixpoint C_form_to_Σf_form (phi:  @form C_Σf _ _ _)(rho: nat -> @term C_Σf): (@form Σf _ _ _)*(nat -> (@term C_Σf)).
-Proof.
-  refine(  match phi with 
-  |  @falsity _ _ _ => (@falsity Σf _ _, rho) 
-  |  @atom _ _ _ _ P vv => match let (ww, sigma) := (map (fun x => C_term_to_Σf_term x rho) vv) in 
-                                              (@atom Σf _ _ _ P ww, sigma)
-  | _ => _
-  end).
 
 Lemma truth_lemma: 
   forall (G_n : nodes)(phi: @form C_Σf),
