@@ -846,7 +846,8 @@ Section Completeness.
   Inductive term_c_bounded : nat-> @term C_Σf -> Prop :=
   | bounded_var : forall (n x : nat), term_c_bounded n (var x)
   | bounded_c   : forall (n k c: nat), k<n -> term_c_bounded n (@func C_Σf (inr (k, c)) (nil _) )
-  | bounded_f   : forall (n:nat)f (vv: (t term (@ar_syms C_Σf (inl f)))), (forall (trm: term),  In trm vv -> term_c_bounded n trm) -> term_c_bounded n (@func C_Σf (inl f) vv).
+  | bounded_f   : forall (n:nat)f (vv: (t term (@ar_syms C_Σf (inl f)))), 
+                  (forall (trm: term),  In trm vv -> term_c_bounded n trm) -> term_c_bounded n (@func C_Σf (inl f) vv).
   
   Inductive c_bounded : nat -> @form C_Σf _ _ _-> Prop :=
   | bounded_falsity : forall (n:nat), c_bounded n falsity 
@@ -956,7 +957,7 @@ Proof.
   | @func _ (inl f) vv => @func Σf f (map C_closed_term_to_Σf_term vv)
   | @func _ (inr f) vv =>  @var Σf 0
   end).
-Qed.
+Defined.
 
 Fixpoint C_closed_form_to_Σf_form (phi: form C_Σf) : form Σf.
 Proof.
@@ -966,7 +967,7 @@ Proof.
   | @bin _ _ _ falsity_on bb phi psi => @bin Σf _ _ falsity_on bb (C_closed_form_to_Σf_form phi) (C_closed_form_to_Σf_form psi)
   | @quant _ _ _ falsity_on qq phi => @quant Σf _ _ falsity_on qq (C_closed_form_to_Σf_form phi) 
   end).
-Qed.
+Defined.
 
 Fixpoint term_count_C (trm: @term C_Σf): nat :=
 match trm with 
@@ -1033,7 +1034,7 @@ Proof.
   rewrite Nat.add_succ_comm. reflexivity.
   rewrite <- H.
   exact (temp_fold_left_subs (S len_ww) (temp_subst n_ww aa) _ vv).
-Qed.
+Defined.
 
 Fixpoint temp_fold_left_subs' (rho:  nat -> @term C_Σf){len_ww}(n_ww : nat * (t (@term C_Σf) len_ww)) {len_vv} (vv: t (@term C_Σf) len_vv)
 : (nat -> @term C_Σf)*nat* t (@term C_Σf) (len_vv + len_ww). 
@@ -1050,7 +1051,7 @@ Proof.
   rewrite Nat.add_succ_comm. reflexivity.
   rewrite <- H.
   exact (temp_fold_left_subs'  rho' (S len_ww) (n' , ww') _ vv). 
-Qed.
+Defined.
 
 Definition fold_left_subs {len_vv}(n: nat)(vv: t (@term C_Σf) len_vv) := 
 @temp_fold_left_subs 0 (n,(nil _)) _ vv.
@@ -1069,7 +1070,7 @@ Proof.
   all: simpl in *.
   rewrite plus_n_O.
   exact vv'.
-Qed.
+Defined.
 
 Fixpoint C_term_to_C_Σf_closed_term' (rho:  nat -> @term C_Σf)(n: nat)(trm:  @term C_Σf): (nat -> @term C_Σf)*(nat)*(@term C_Σf).
 Proof.
@@ -1083,7 +1084,7 @@ Proof.
   all: simpl in *.
   rewrite plus_n_O.
   exact vv'.
-Qed.
+Defined.
 
 Definition C_term_to_Σf_term (n: nat)(trm: @term C_Σf): (@term Σf) :=
   let (n', trm'):= C_term_to_C_Σf_closed_term n trm in 
@@ -1107,7 +1108,7 @@ Proof.
   end).
   rewrite plus_n_O.
   exact vv'.
-Qed.
+Defined.
 
 Fixpoint C_form_to_C_Σf_closed_form' (rho:  nat -> @term C_Σf)(n: nat)(phi: form C_Σf): (nat -> @term C_Σf)*(nat)*(form C_Σf).
 Proof.
@@ -1125,7 +1126,7 @@ Proof.
   end).
   rewrite plus_n_O.
   exact vv'.
-Qed.
+Defined.
 
 Definition C_form_to_Σf_form (phi: form C_Σf) :=
   let (n, phi'):= C_form_to_C_Σf_closed_form 0 (prepare_form phi) in 
@@ -1138,6 +1139,81 @@ Definition C_form_to_Σf_form' (rho:  nat -> @term C_Σf)(phi: form C_Σf) :=
 
 Definition C_form_to_Σf_form_rho (rho:  nat -> @term C_Σf)(phi: form C_Σf) :=
   let (rho', _):= C_form_to_Σf_form' rho phi in rho'.
+
+(*TO GET EASIER LIFE HERE, I HAD TO PUT DEFINED EVERYWHERE*)  
+
+Lemma sanity_translation (rho rho':  nat -> @term C_Σf)(phi: form C_Σf)(phi': form Σf): 
+  (rho', phi') = C_form_to_Σf_form' rho phi ->
+  phi[rho] = (form_to_C_Σf_form phi')[rho'].
+Proof.
+  induction phi using form_ind_falsity;
+  intros; simpl; cbn in H.  (*with (f:= falsity_on).*)
+  + injection H; intros.
+    rewrite H0.
+    simpl. reflexivity. 
+  + admit.
+Admitted.
+
+Lemma term_to_C_Σf_term_closed:
+  forall (trm: term  Σf),
+  term_c_bounded 0 (term_to_C_Σf_term trm).
+Proof.
+  intros. 
+  induction (term_to_C_Σf_term trm).
+  + eapply bounded_var.
+  + intros. fold term_to_C_Σf_term. induction F.
+    * eapply bounded_f; intros. eapply IH; eauto.
+    * (*destruct H. inversion .
+     destruct b0 as (k,c). simpl in v0. 
+      pose proof (nil_spec v0).
+      rewrite H in IH.
+      discriminate. 
+      eapply Forall_nil in IH.
+      eauto.
+    
+    simpl in v0. pose proof (nil_spec v0).
+    pose proof nil_spec in v0.
+    Forall_nil
+    Search nil.
+    
+    assert (term_to_C_Σf_term trm = func (inr b0) v0).
+      admit.
+      unfold term_to_C_Σf_term in *.
+      discriminate H.
+      destruct b0 as (k,c). 
+      simpl in v0.
+      pose proof (nil_spec v0).
+      rewrite H.
+      eapply bounded_c. *)
+  admit.
+Admitted.
+
+Lemma form_to_C_Σf_form_closed:
+  forall (phi: form  Σf),
+  c_bounded 0 (form_to_C_Σf_form phi).
+Proof.
+  intros. 
+  assert (exists phi': form C_Σf, phi' = form_to_C_Σf_form phi).
+  exists (form_to_C_Σf_form phi). reflexivity.
+  destruct H as (phi', eq_phi).
+  rewrite <- eq_phi.
+  eapply form_ind_falsity. 
+  + eapply bounded_falsity. 
+  + intros. eapply bounded_p. admit.
+  + intros. eapply bounded_bin; eauto.  
+  + intros. eapply bounded_quant; eauto.
+Admitted.  
+
+Lemma theory_to_C_Σf_theory_closed:
+  forall (T : theory Σf),
+  th_c_bounded 0 (theory_to_C_Σf_theory T). 
+Proof.
+  unfold th_c_bounded; intros.
+  unfold theory_to_C_Σf_theory in H.
+  destruct H as (phi', H).
+  rewrite <- H.
+  eapply form_to_C_Σf_form_closed.
+Qed.
 
   (*scan a formula, 
     count how many constants (count), 
@@ -1375,6 +1451,7 @@ Qed.
 
 Arguments form _ {_ _ _}.
 
+(*
 Lemma prv_ext (T: theory Σf)(A: form Σf):
     T ⊢ A <-> theory_to_C_Σf_theory T  ⊢ form_to_C_Σf_form A.
 Proof.
@@ -1411,13 +1488,45 @@ Proof.
       - admit.
   + admit.
 Admitted.
+*)
+Lemma subst_term_id {sigma : funcs_signature}(t: term sigma):
+  subst_term (fun n : nat => $ n) t = t.
+Proof.
+  induction t.
+  + eauto.
+  + admit.
+Admitted.
+
+Search subst_form.
+Lemma subst_form_id:
+  forall phi: form Σf, phi[(fun n => var n)] = phi .
+Proof.
+  intros.
+  induction phi using form_ind_falsity; cbn.
+  + reflexivity.
+  + erewrite map_ext.
+    2: intros; eapply subst_term_id.
+    f_equal. eauto. Search map. eapply map_id.
+  + f_equal; eauto.
+  + enough (quant q phi [up (fun n : nat => $ n)] = quant q (phi [fun n : nat => $ n])).
+    erewrite IHphi in H; eauto.
+    cbn.
+    admit.
+    (*????????? erewrite f_equal. eauto.*)
+Admitted.
 
 Lemma n_saturated_not_proves (G_0: theory Σf)(A: form Σf):
  (G_0 ⊢ A -> False) ->
  forall n : nat, ((saturated_from_Gamma_0_fix G_0 A n  ⊢ form_to_C_Σf_form A) -> False).
 Proof.
   induction n.
-  + simpl. intros. eapply prv_ext in H0. eauto.
+  + simpl. intros.
+    unfold theory_to_C_Σf_theory in H0.
+    destruct H0 as (Delta, H0).
+    admit.
+    (*erewrite subst_form in H0.
+    erewrite sanity_translation in H0. with (rho := 
+    eapply union_f in H0. eapply prv_ext in H0. eauto.*)
   + intros. 
     destruct H0 as (D, (H0, HH0)).
     admit.
@@ -1443,8 +1552,15 @@ Proof.
 Admitted.
 
 (*CANONICAL FRAME*)
+Class canonical_nodes:= 
+{
+  c_n_th : theory C_Σf;
+  c_n_nat : nat;
+  c_n_s : n_saturated c_n_nat c_n_th
+}.
+(*
 Definition canonical_nodes := { G_n :  (theory C_Σf )*nat | let (Gamma, n) := G_n in 
-  n_saturated n Gamma }.
+  n_saturated n Gamma }. *)
 
 Definition c_n_set: canonical_nodes -> (theory C_Σf) := 
   fun (G_n : canonical_nodes) => let (G_n, H):= G_n  in
@@ -1587,11 +1703,14 @@ Existing Instance C_Σf.
 
 Lemma truth_lemma_rho':
   forall (G_n : nodes)(phi: form C_Σf)(rho : nat -> term),
-  c_bounded (c_n_nat G_n) phi [rho]-> 
+  (forall psi: form C_Σf, (c_n_set G_n) psi -> c_bounded (c_n_nat G_n) psi) -> 
+  c_bounded (c_n_nat G_n) phi -> 
+  (forall n: nat, term_c_bounded (c_n_nat G_n) (rho n)) ->
   ((c_n_set G_n) (phi[rho])) <-> (let (rho', phi'):= C_form_to_Σf_form' rho phi in 
   @ksat Σf Σp canonical_model_frm canonical_model falsity_on G_n rho' phi').
 Proof.
   intros G_n phi; revert G_n.
+  (*
   apply (form_ind_falsity (P:= fun phi => forall G_n  (rho : nat -> term),
     c_bounded (c_n_nat G_n) phi [rho] ->
     c_n_set G_n phi [rho] <-> (let (rho', phi'):= C_form_to_Σf_form' rho phi in 
@@ -1685,6 +1804,38 @@ Proof.
        Check syms
        exists(func (inr (k, c)) (nil _)).
        eapply ExE in HH1.  
+    *)
+Admitted.
 
-*)
+Definition kvalid_theo {sigma: funcs_signature}(T : theory sigma)(phi: form sigma) :=
+  forall (M: kmodel) (u: nodes) (rho: nat -> domain),
+    good u rho -> (forall psi, T psi -> @ksat sigma _ _ M _ u rho psi) ->
+    @ksat sigma _ _ M _ u rho phi.
+
+Notation "T '⊩' phi" := (kvalid_theo T phi) (at level 20). 
+
+Lemma completeness:
+  forall (T: theory Σf)(phi: form Σf),
+  T ⊩ phi -> T ⊢ phi.
+Proof.
+  intros.
+  apply DNE.
+  intros.
+  pose proof (theory_to_C_Σf_theory_closed).
+  specialize (H1 T).
+  pose proof (form_to_C_Σf_form_closed).
+  specialize (H2 phi).
+  assert (theory_to_C_Σf_theory T ⊢ form_to_C_Σf_form phi -> False).
+  admit.
+   (* T ⊢ phi <-> theory_to_C_Σf_theory T ⊢ form_to_C_Σf_form phi ?????? SECONDO ME NO*)
+  pose proof saturation_lemma.
+  specialize (H4 0 (theory_to_C_Σf_theory T) (form_to_C_Σf_form phi) H1 H2 H3).
+  destruct H4 as (Delta, (Hincl, (Hsat, Hcon))).
+  Print canonical_nodes.
+  assert ((Delta,0): canonical_nodes).
+.
+
+
+
+
 End Completeness.
