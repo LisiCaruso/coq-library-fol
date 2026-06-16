@@ -18,7 +18,7 @@ Context {Σ_preds : preds_signature}.
 Arguments eval {_ _ _} _ _ _.
 Arguments i_atom {_ _ _} _ _.
 Arguments i_func {_ _ _} _ _.
-
+  
 Class kframe :=
 { 
   domain : Type;
@@ -46,16 +46,17 @@ Qed.
 Class kmodel := 
 {
   I : nodes -> interp domain;
-  
-  mon_f (u v:nodes) (f: syms) (vv: (t domain (ar_syms f))) (reach : reachable u v): 
-    in_dom u vv -> i_func (I u) f vv = i_func (I v) f vv;
 
-  k_f_wellDef u f vv (vv_in_dom : (in_dom u vv)): world u (i_func (I u) f vv);
+  k_P_wellDef u P vv: i_atom (I u) P vv -> in_dom u vv;
 
   mon_P (u v:nodes) (P: preds) (vv: (t domain (ar_preds P))) (reach : reachable u v) (a : in_dom u vv): 
       i_atom (I u) P vv -> i_atom (I v) P vv;
 
-  k_P_wellDef u P vv: i_atom (I u) P vv -> in_dom u vv;
+  k_f_wellDef u f vv (vv_in_dom : (in_dom u vv)): world u (i_func (I u) f vv);
+
+  mon_f (u v:nodes) (f: syms) (vv: (t domain (ar_syms f))) (reach : reachable u v): 
+    in_dom u vv -> i_func (I u) f vv = i_func (I v) f vv;
+
 }.
 
 Context {M : kmodel}.
@@ -194,6 +195,13 @@ Context {frm : kframe}.
 Context {M : kmodel}.
 
 Arguments eval {_ _ _} _ _ _.
+
+Lemma ksat_consistent u rho phi:
+  good u rho -> ksat u rho phi -> ksat u rho (bin Impl phi falsity) -> False.
+Proof.
+  intros.
+  eapply H1; eauto using reach_refl.
+Qed.
 
 Lemma ksat_mon {ff : falsity_flag}(u v: nodes) (rho : nat -> domain) (phi : form) : 
   good u rho -> reachable u v -> ksat u rho phi -> ksat v rho phi.
