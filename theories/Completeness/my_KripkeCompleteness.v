@@ -185,27 +185,29 @@ End VariableDomainKripke.
 Arguments kmodel {_ _ _}.
 
 #[local] Ltac comp := repeat (progress (cbn in *; autounfold in *)).
-#[local] Ltac temp_k_solve := (eauto using good_mon, good_shift, good_comp, good_eval, eval_mon, map_eval_vv, shift_ext, good_ext, good_comp, eval_mon_shift_up, eval_shift_up, reach_refl, reach_tran).
+#[local] Ltac temp_k_solve := (eauto using monotone, good_mon, good_shift, good_comp, good_eval, eval_mon, map_eval_vv, shift_ext, good_ext, good_comp, eval_mon_shift_up, eval_shift_up, reach_refl, reach_tran).
 #[local] Ltac k_solve := (repeat (temp_k_solve)).
 
 Section KripkeSat.
-
 Context {Σf : funcs_signature} {Σp : preds_signature}.
 Context {frm : kframe}.
 Context {M : kmodel}.
 
-Arguments eval {_ _ _} _ _ _.
-
-Lemma ksat_consistent u rho phi:
-  good u rho -> ksat u rho phi -> ksat u rho (bin Impl phi falsity) -> False.
+Lemma ksat_consistent u rho:
+  ksat u rho falsity -> False.
 Proof.
-  intros.
-  eapply H1; eauto using reach_refl.
+  cbn; eauto.
+Qed.
+
+Lemma ksat_consistent' u rho phi:
+  ksat u rho phi -> ksat u rho (bin Impl phi falsity) -> False.
+Proof.
+  intros; eapply H0; eauto using reach_refl.
 Qed.
 
 Lemma ksat_mon {ff : falsity_flag}(u v: nodes) (rho : nat -> domain) (phi : form) : 
   good u rho -> reachable u v -> ksat u rho phi -> ksat v rho phi.
-Proof.
+Proof.  
   revert rho. 
   induction phi; intros rho gd R H; cbn.
   * apply H.
@@ -231,14 +233,48 @@ Proof.
   - eapply ksat_mon; eauto.
   - auto using reach_refl.
 Qed.
-    
+
+Arguments ksat {_ _ _} _ {_} _, _ _ _ _ _ _.
+Arguments form {_ _ _} _.
+Arguments theory _ {_ _ _}.
+
+Definition ktheo {frm: kframe}{ff : falsity_flag}(M: kmodel)(phi : form ff) :=
+  forall rho u, good u rho -> ksat M u rho phi.
+
+Definition kvalid {frm: kframe}{ff : falsity_flag}(phi : form ff):=
+  forall (M: kmodel) (u: nodes) (rho: nat -> domain), 
+  good u rho -> ksat M u rho phi.
+
+Definition ksatis {frm: kframe}{ff : falsity_flag}(phi : form ff) :=
+  exists (M: kmodel) (u: nodes) (rho: nat -> domain), good u rho /\ ksat M u rho phi.
+
+Definition kvalid_ctx {frm: kframe}{ff : falsity_flag}(A : list (form ff)) (phi: form ff) :=
+  forall (M: kmodel) (u: nodes) (rho: nat -> domain),
+    good u rho -> (forall psi, psi el A -> ksat M u rho psi) -> ksat M u rho phi.
+
+Arguments form _ {_ _ _}.
+
+Definition kvalid_theo {sigma: funcs_signature}(T : theory sigma)(phi: form sigma) :=
+  forall (M: kmodel) (u: nodes) (rho: nat -> domain),
+    good u rho -> (forall psi, T psi -> @ksat sigma _ _ M _ u rho psi) ->
+    @ksat sigma _ _ M _ u rho phi.
+
+Arguments theory {_ _ _ _}.
+End KripkeSat. 
+
 Notation "rho  '⊩(' u ')'  phi" := (ksat _ u rho phi) (at level 20).
 Notation "rho '⊩(' u , M ')' phi" := (@ksat _ _ _ M _ u rho phi) (at level 20).
+Notation "A '⊨' phi" := (kvalid_ctx A phi) (at level 20). 
 
 Arguments ksat {_ _ _} _ _ _, _ _ _ _ _ _.
+Arguments eval {_ _ _} _ _ _.
+Arguments form {_ _ _ _}.
 Hint Resolve reach_refl : core.
 
 Section Substs.
+Context {Σf : funcs_signature} {Σp : preds_signature}.
+Context {frm : kframe}.
+Context {M : kmodel}.
 
 Lemma ksat_ext {ff : falsity_flag}(u: nodes)(rho xi: nat -> domain)(phi: form):
   good u rho -> (forall x, rho x = xi x) -> (rho ⊩(u,M) phi <-> xi ⊩(u,M) phi).
@@ -294,33 +330,10 @@ Proof.
 Qed.
 
 End Substs.
-End KripkeSat. 
-
-Notation "rho  '⊩(' u ')'  phi" := (ksat _ u rho phi) (at level 20).
-Notation "rho '⊩(' u , M ')' phi" := (@ksat _ _ _ M _ u rho phi) (at level 20).
-
 
 Section Soundness.
 Context {Σf : funcs_signature} {Σp : preds_signature}.
 Context {frm : kframe}.
-
-Arguments ksat {_ _ _} _ {_} _, _ _ _ _ _ _.
-
-Definition ktheo (M: kmodel)(phi : form) :=
-  forall rho u, good u rho -> ksat M u rho phi.
-
-Definition kvalid phi {ff : falsity_flag}:=
-  forall (M: kmodel) (u: nodes) (rho: nat -> domain), 
-  good u rho -> ksat M u rho phi.
-
-Definition ksatis {ff : falsity_flag} phi :=
-  exists (M: kmodel) (u: nodes) (rho: nat -> domain), good u rho /\ ksat M u rho phi.
-
-Definition kvalid_ctx {ff : falsity_flag}(A : list form) (phi: form) :=
-  forall (M: kmodel) (u: nodes) (rho: nat -> domain),
-    good u rho -> (forall psi, psi el A -> ksat M u rho psi) -> ksat M u rho phi.
-
-Notation "A '⊩' phi" := (kvalid_ctx A phi) (at level 20). 
 
 Arguments form {_ _ _} __.
 
@@ -366,7 +379,7 @@ Qed.
 Arguments prv {_ _ _} _.
 
 Lemma soundness {ff : falsity_flag} (A : list (form ff))(phi: (form ff)):
-  A ⊢I phi -> A ⊩ phi.
+  A ⊢I phi -> A ⊨ phi.
 Proof.
   intros H M.
   apply (prv_ind_intu (P := fun ff A phi => forall (u : nodes) (rho : nat -> domain),
@@ -376,7 +389,7 @@ Proof.
   * simpl; intros; destruct H6; [rewrite <- H6 | eapply ksat_mon]; eauto.
   * intros psi0 [psi' [<- HH]] % in_map_iff. 
     rewrite ksat_comp. eapply ksat_mon. all: k_solve. 
-  * erewrite ksat_comp. erewrite ksat_ext. eapply (H1 u rho H2 H3 u (reach_refl u) (eval rho t)).
+  * erewrite ksat_comp. erewrite ksat_ext. eapply (H1 u rho H2 H3 u (reach_refl u) (eval _ rho t)).
     3: intros; unfold ">>"; induction x; simpl; reflexivity.
     all: k_solve.
   * specialize (H1  u rho); apply ksat_comp in H1.
@@ -396,95 +409,64 @@ Qed.
     
 End Soundness.  
 
+Arguments ksat {_ _ _ _ _} _ _ _.
+
 Section PropKsat.
   Context {Σf : funcs_signature} {Σp : preds_signature}.
   Context {frm : kframe}.
   Context {M : kmodel}. 
   #[local] Existing Instance falsity_on.
 
-  Arguments ksat {_ _ _ _ _} _ _ _.
+Lemma ksat_DN_in (u: nodes)(rho: nat -> domain)(phi: form) :
+  good u rho ->
+  ksat u rho phi -> ksat u rho (bin Impl (bin Impl (phi) ⊥) ⊥).
+Proof.
+  simpl; intros.
+  eapply ksat_mon in H; eauto. 
+Qed.
 
-  Lemma ksat_DN_in (u: nodes)(rho: nat -> domain)(phi: form) :
-    good u rho ->
-    ksat u rho phi -> ksat u rho (bin Impl (bin Impl (phi) ⊥) ⊥).
-  Proof.
-    simpl; intros.
-    eapply ksat_mon in H; eauto. 
-    specialize (H2 v (reach_refl v)); eauto.
-  Qed.
+Lemma ksat_neg_in_out (u: nodes)(rho: nat -> domain)(phi: form) :
+  good u rho -> 
+  ksat u rho (bin Impl (phi) ⊥) -> ((ksat u rho phi) -> False).
+Proof.
+  intros.
+  eapply H0; eauto using reach_refl.
+Qed.
 
-  Lemma ksat_neg_in_out (u: nodes)(rho: nat -> domain)(phi: form) :
-    good u rho -> 
-    ksat u rho (bin Impl (phi) ⊥) -> ((ksat u rho phi) -> False).
-  Proof.
-    intros.
-    eapply H0; eauto using reach_refl.
-  Qed.
+Lemma kvalid_ctx_bot_DNE (T : list form):
+  (((kvalid_ctx T ⊥) -> False )-> False) <-> (kvalid_ctx T ⊥).
+Proof.
+  split; intros; eauto.
+  unfold kvalid_ctx in *; simpl; intros.
+  eapply H; simpl; intros. eapply H2; eauto.
+Qed.
 
-  (*Lemma ksat_neg_out_in (u: nodes)(rho: nat -> domain) :
-    good u rho -> 
-    (forall phi : form, ((ksat u rho phi) -> False) -> ksat u rho (bin Impl (phi) ⊥)) 
-    -> completeness -> EM???*)
+Lemma ksat_neg (M0 : kmodel)(u: nodes)(rho: nat -> domain)(phi: form):
+  (rho ⊩( u, M0) (¬ phi) <-> (forall v: nodes, reachable u v -> (rho ⊩( v, M0) phi) ->  False)).
+Proof. 
+  simpl; now eauto.
+Qed.
 
-    (*-> 
-    (forall phi : form, (ksat u rho phi) \/ ((ksat u rho phi) -> False)). *)
-  Lemma kvalid_ctx_bot_DNE (T : list form):
-    (((kvalid_ctx T ⊥) -> False )-> False) <-> (kvalid_ctx T ⊥).
-  Proof.
-    split; intros; eauto.
-    unfold kvalid_ctx in *; simpl; intros.
-    eapply H; simpl; intros. eapply H2; eauto.
-  Qed.
+Lemma kvalid_ctx_DN_out_in (T : list form)(phi: form):
+  (((kvalid_ctx T phi) -> False )-> False) -> (kvalid_ctx T (bin Impl (bin Impl (phi) ⊥) ⊥)).
+Proof.
+  unfold kvalid_ctx; intros.
+  eapply (ksat_neg M0 u rho (¬ phi)); simpl; intros. 
+  eapply H; intros.
+  assert (forall psi : form, psi el T -> rho ⊩( v, M0) psi); intros. eapply ksat_mon; eauto.
+  specialize (H4 M0 v rho (good_mon H0 H2) H5).
+  eapply H3; eauto using reach_refl.
+Qed.
 
-  Lemma ksat_neg (M0 : kmodel)(u: nodes)(rho: nat -> domain)(phi: form):
-    (rho ⊩( u, M0) (¬ phi) <-> (forall v: nodes, reachable u v -> (rho ⊩( v, M0) phi) ->  False)).
-  Proof. 
-    simpl; now eauto.
-  Qed.
-
-  Lemma kvalid_ctx_DN_out_in (T : list form)(phi: form):
-    (((kvalid_ctx T phi) -> False )-> False) -> (kvalid_ctx T (bin Impl (bin Impl (phi) ⊥) ⊥)).
-  Proof.
-    unfold kvalid_ctx; intros.
-    eapply (ksat_neg M0 u rho (¬ phi)); simpl; intros. 
-    eapply H; intros.
-    assert (forall psi : form, psi el T -> rho ⊩( v, M0) psi); intros. eapply ksat_mon; eauto.
-    specialize (H4 M0 v rho (good_mon H0 H2) H5).
-    eapply H3; eauto using reach_refl.
-  Qed.
-
- (* Lemma ksat_DN_in_out (u: nodes)(rho: nat -> domain)(phi: form) :
-    good u rho ->
-    ksat u rho (bin Impl (bin Impl (phi) ⊥) ⊥) -> ((ksat u rho phi -> False ) -> False).
-THIS IS FALSE
-
-  Definition EM (P: Prop): Prop := P \/ (P-> False).
-
-  Lemma ksat_DNE' (u: nodes)(rho: nat -> domain)(phi: form) :
-    good u rho ->
-    (ksat u rho phi <-> ksat u rho (bin Impl (bin Impl (phi) ⊥) ⊥)) -> EM (ksat u rho phi).
-  Proof.
-    intros; 
-THIS IS FALSE I THINK
-  *)
-
-    
-    
 End PropKsat.
 
 Section ConstantDomain.
   Context {Σf : funcs_signature} {Σp : preds_signature}.
   Context {frm : kframe}.
-  (* Context {M : kmodel}. *) 
-  Definition constant_domain (fr : kframe)(M : kmodel) :  Prop :=
-      (forall (u v: nodes) (j: domain), world u j <-> world v j).
-  (*
-  Definition constant_domain' (fr : kframe)(M : kmodel) :  Prop :=
-      forall (u : nodes) (j: domain), world u j.
-  
-  Definition non_empty (fr : kframe)(M : kmodel) :  Prop :=
-      exists (u : nodes) (j: domain), world u j.
-  *)
+
+  Definition constant_domain {fr : kframe}(M : kmodel) :  Prop :=
+    (forall (u v: nodes) (j: domain), world u j <-> world v j).
+
   Definition constant_domain_meta :=
   forall (X: Type)(A: X -> Prop)(B: Prop),
     (forall x: X, (A x \/ B)) -> ((forall x: X, A x) \/ B).
@@ -514,52 +496,51 @@ Section ConstantDomain.
     + right. eapply H.
   Qed. 
 
-(*
-  Lemma CD_exist (fr : kframe)(M: kmodel)(u : nodes) (rho: nat -> domain) (phi: form): 
-    constant_domain M -> (ksat u rho (quant All phi) <-> forall (j: domain), (exists (v: nodes), world v j) -> (j .: rho) ⊩( u, M) phi).
-  Proof.
-    split; intros.
-    + destruct H1. eapply H0. eapply reach_refl. eapply H; eauto. 
-    + cbn. intros. specialize (H0 j). eapply ksat_mon; eauto. unfold good. intros. eapply H. 
-  Qed.
+Lemma CD_forall (fr : kframe)(M: kmodel)(u : nodes) (rho: nat -> domain) (phi: form): 
+  constant_domain M -> good u rho -> (ksat u rho (quant All phi) <-> forall (j: domain), (exists (v: nodes), world v j) -> (j .: rho) ⊩( u, M) phi).
+Proof.
+  split; intros.
+  + destruct H2. eapply H1. eapply reach_refl. eapply H; eauto. 
+  + cbn. intros. specialize (H1 j). eapply ksat_mon; eauto. 
+    unfold good. intros. eapply H. 
+    enough (world v ((j .: rho) n)); eauto. 
+    induction n; cbn; eauto using monotone, H0.
+Qed.
 
-  Lemma CD_forall (fr : kframe) (M: kmodel)(u: nodes) (rho: nat -> domain) (phi: form): 
-    constant_domain M -> (ksat u rho (quant Ex phi) <-> exists (j: domain), (j .: rho) ⊩( u, M) phi).
-  Proof.
-    split; intros.
-    + simpl in H0; repeat destruct H0. exists x.
-      eapply H1. 
-    + cbn. destruct H0. exists x. split.
-      eapply H. eapply H0.
-  Qed.
-  *)
+Lemma CD_exists (fr : kframe) (M: kmodel)(u: nodes) (rho: nat -> domain) (phi: form): 
+  constant_domain M -> good u rho -> (ksat u rho (quant Ex phi) <-> exists (j: domain), (exists (v: nodes), world v j) /\ (j .: rho) ⊩( u, M) phi).
+Proof.
+  split; intros.
+  + simpl in H1; repeat destruct H1. exists x; eauto.
+  + cbn. repeat destruct H1. exists x. split.
+    eapply H. all: eauto. 
+Qed.
 
-(* rho ⊩( u, M) ((∀ phi ∨ psi [↑]) → (∀ phi) ∨ psi [↑])*)
-  Lemma CD_imp_CD_axiom (M: kmodel)(rho: nat -> my_KripkeCompleteness.domain)(phi psi: form):
-        constant_domain M -> constant_domain_meta -> 
-        forall (u : nodes), good u rho ->
-        ksat u rho (bin Impl (quant All (bin Disj phi (psi[↑]))) (bin Disj (quant All  phi) (psi))).
-    Proof.
-    simpl; intros.
-    unfold constant_domain in H; unfold constant_domain_meta in H0.
-    eapply H0; intros.
-    eapply cdm_distr_impl_or; eauto; intros.
-    eapply H0; intros.
-    eapply cdm_distr_impl_or; eauto. 
-    revert x0.
-    assert ((forall x0 : domain, world x x0 -> (x0 .: rho) ⊩( x, M) phi \/ (x0 .: rho) ⊩( v, M) psi [↑])
-    <-> (forall x0 : domain, world x x0 -> (x0 .: rho) ⊩( x, M) phi \/ rho ⊩( v, M) psi)
-    ).
-    * split; intros; specialize (H5 x0 H6); destruct H5. 
-      1,3: left; eauto.
-      1,2: right. 1: eapply ksat_shift. 4: erewrite <- ksat_shift. 
-      all: eauto using good_mon; eapply H; eauto. 
-    * eapply H5; intros.
-      pose proof (H x v x0). eapply H7 in H6.
-      specialize (H3 v (reach_refl v) x0 H6); destruct H3.
-      left; eapply ksat_mon; eauto using H3, good_mon, good_shift.
-      right; apply H3. 
-    Qed.
+Lemma CD_imp_CD_axiom (M: kmodel)(rho: nat -> my_KripkeCompleteness.domain)(phi psi: form):
+      constant_domain M -> constant_domain_meta -> 
+      forall (u : nodes), good u rho ->
+      ksat u rho (bin Impl (quant All (bin Disj phi (psi[↑]))) (bin Disj (quant All  phi) (psi))).
+Proof.
+  simpl; intros.
+  unfold constant_domain in H; unfold constant_domain_meta in H0.
+  eapply H0; intros.
+  eapply cdm_distr_impl_or; eauto; intros.
+  eapply H0; intros.
+  eapply cdm_distr_impl_or; eauto. 
+  revert x0.
+  assert ((forall x0 : domain, world x x0 -> (x0 .: rho) ⊩( x, M) phi \/ (x0 .: rho) ⊩( v, M) psi [↑])
+  <-> (forall x0 : domain, world x x0 -> (x0 .: rho) ⊩( x, M) phi \/ rho ⊩( v, M) psi)
+  ).
+  * split; intros; specialize (H5 x0 H6); destruct H5. 
+  1,3: left; eauto.
+  1,2: right. 1: eapply ksat_shift. 4: erewrite <- ksat_shift. 
+  all: eauto using good_mon; eapply H; eauto. 
+  * eapply H5; intros.
+  pose proof (H x v x0). eapply H7 in H6.
+  specialize (H3 v (reach_refl v) x0 H6); destruct H3.
+  left; eapply ksat_mon; eauto using H3, good_mon, good_shift.
+  right; apply H3. 
+Qed.
 
 End ConstantDomain.
 
@@ -748,8 +729,12 @@ Section Example_nonConstantDomain.
                               end;
     |}.
     Proof.
-      - induction u0; induction v0; simpl; reflexivity.
-      - induction u0; simpl; auto.
+      - unfold in_dom; intros; induction u0; simpl in *; eauto.
+        destruct x; eauto.
+        dependent destruction vv; induction h; destruct vv; destruct P; eauto.
+        apply In_inv in H0; simpl in H0; destruct H0.
+        discriminate H0.
+        apply In_inv in H0; simpl in H0; eauto.
       - intros.
         remember P as PP.
         induction PP; induction u0; induction v0; cbn; eauto; unfold in_dom in a0.
@@ -757,13 +742,9 @@ Section Example_nonConstantDomain.
         dependent destruction vv.
         simpl in H; eauto.
         all : dependent destruction vv. eauto.
-        all: simpl in H; eauto.
-      - unfold in_dom; intros; induction u0; simpl in *; eauto. 
-        dependent destruction vv; induction h; destruct vv; destruct P; eauto.
-        destruct x; eauto.
-        apply In_inv in H0; simpl in H0; destruct H0.
-        discriminate H0.
-        apply In_inv in H0; simpl in H0; eauto.
+        all: simpl in H; eauto. 
+      - induction u0; simpl; auto.
+      - induction u0; induction v0; simpl; reflexivity.  
     Defined.
 
   Definition A (alpha: t term 1): form :=  atom Q alpha.
@@ -1031,7 +1012,7 @@ Fixpoint form_to_C_Σf_form (phi: form Σf): form C_Σf:=
 end.
 
 Definition theory_to_C_Σf_theory (T: theory Σf): theory C_Σf :=
-  fun phi => (exists phi': form Σf, form_to_C_Σf_form phi' = phi).
+  fun phi => (exists phi': form Σf, form_to_C_Σf_form phi' = phi /\ T phi').
 
 Fixpoint C_closed_term_to_Σf_term (t: @term C_Σf) : @term Σf.
 Proof.
@@ -1358,7 +1339,7 @@ Lemma theory_to_C_Σf_theory_closed:
 Proof.
   unfold th_c_bounded; intros.
   unfold theory_to_C_Σf_theory in H.
-  destruct H as (phi', H).
+  destruct H as (phi',( H, H1)).  
   rewrite <- H.
   eapply form_to_C_Σf_form_closed.
 Qed.
@@ -1626,7 +1607,18 @@ Arguments form _ {_ _ _}.
 Lemma prv_ext (T: theory Σf)(A: form Σf):
     T ⊢ A <-> theory_to_C_Σf_theory T  ⊢ form_to_C_Σf_form A.
 Proof.
-  admit.
+  split.
+  2: admit.
+  unfold "⊢".  
+  intros. destruct H as (G, (H1, H)). 
+  exists (List.map form_to_C_Σf_form G). split.
+  intros.
+  unfold theory_to_C_Σf_theory.
+  eapply in_map_iff in H0.
+  destruct H0 as (phi', (HH, HT)).
+  exists phi'. split; eauto.
+  remember intu as temp.
+Admitted.
   (*
   unfold "⊢".  
   intros; destruct H as (G, (H1, H)). 
@@ -1657,7 +1649,6 @@ Proof.
       - eapply DE; eauto.
       - admit.
     *)
-Admitted.
 
 Lemma n_saturated_c_bound (G_0: theory C_Σf)(A: form C_Σf)(N : nat)(phi : form C_Σf):
   th_c_bounded N G_0 -> c_bounded N A ->  (G_0 ⊢ A -> False) ->
@@ -1890,20 +1881,20 @@ Definition I_Gamma (Gamma: canonical_nodes): interp (@term C_Σf):=
    I:= fun Gamma =>  I_Gamma Gamma
 |}.
 Proof.
-  + intros. reflexivity.
-  + intros. unfold in_dom in *.
-    unfold world in *; simpl in *; unfold in_c_world in *. 
-    eapply bounded_f; eapply vv_in_dom.
-  + intros. unfold i_atom in *; simpl in *.
-    unfold c_incl in reach. eapply Weak; eauto.
-    eapply reach.
   + intros. unfold in_dom in *.
     unfold world in *; simpl in *. unfold in_c_world in *.
     eapply iff_der_closed in H.
     eapply c_bound in H.
     Unshelve. 2: eapply n_saturated_nodes.
     eapply c_bound_p_term in H.
-    eapply Forall_forall; eauto.
+    eapply Forall_forall; eauto. 
+    + intros. unfold i_atom in *; simpl in *.
+    unfold c_incl in reach. eapply Weak; eauto.
+    eapply reach.
+  + intros. unfold in_dom in *.
+    unfold world in *; simpl in *; unfold in_c_world in *. 
+    eapply bounded_f; eapply vv_in_dom.
+  + intros. reflexivity.
 Defined.
 
 Lemma good_var (G_n: canonical_nodes):
@@ -2167,16 +2158,12 @@ Admitted.
 
 Existing Instance C_Σf.
 
-Definition kvalid_theo {sigma: funcs_signature}(T : theory sigma)(phi: form sigma) :=
-  forall (M: kmodel) (u: nodes) (rho: nat -> domain),
-    good u rho -> (forall psi, T psi -> @ksat sigma _ _ M _ u rho psi) ->
-    @ksat sigma _ _ M _ u rho phi.
 
-Notation "T '⊩' phi" := (kvalid_theo T phi) (at level 20). 
+Notation "T '⊨' phi" := (kvalid_theo T phi) (at level 20). 
 
 Theorem completeness: 
 forall (T: theory Σf)(phi : form Σf),
-(T ⊩ phi -> T ⊢ phi).
+(T ⊨ phi -> T ⊢ phi).
 Proof.
   intros T phi H.
   eapply DNE; intros.
@@ -2201,7 +2188,7 @@ Proof.
   intros. simpl in H4; destruct H4.
   rewrite <- H4. eapply Hinc. 
   unfold  theory_to_C_Σf_theory.
-  unfold "∈ ". exists psi. reflexivity. eauto.  
+  unfold "∈ ". exists psi; split. reflexivity. all: eauto.  
   eapply Ctx. eauto.
 Qed.
 End Completeness.
