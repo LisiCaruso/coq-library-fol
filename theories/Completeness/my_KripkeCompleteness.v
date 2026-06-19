@@ -461,40 +461,40 @@ Qed.
 End PropKsat.
 
 Section ConstantDomain.
-  Context {Σf : funcs_signature} {Σp : preds_signature}.
-  Context {frm : kframe}.
+Context {Σf : funcs_signature} {Σp : preds_signature}.
+Context {frm : kframe}.
 
-  Definition constant_domain {fr : kframe}(M : kmodel) :  Prop :=
-    (forall (u v: nodes) (j: domain), world u j <-> world v j).
+Definition constant_domain {fr : kframe}(M : kmodel) :  Prop :=
+  (forall (u v: nodes) (j: domain), world u j <-> world v j).
 
-  Definition constant_domain_meta :=
-  forall (X: Type)(A: X -> Prop)(B: Prop),
-    (forall x: X, (A x \/ B)) -> ((forall x: X, A x) \/ B).
+Definition constant_domain_meta :=
+forall (X: Type)(A: X -> Prop)(B: Prop),
+  (forall x: X, (A x \/ B)) -> ((forall x: X, A x) \/ B).
 
-  Lemma cdm_distr_impl_or :
-  constant_domain_meta -> (forall (a b c: Prop), (a -> (b \/ c)) -> ((a -> b) \/ c)).
-  Proof.
-    intros. 
-    eapply H. eauto.
-  Qed.
+Lemma cdm_distr_impl_or :
+constant_domain_meta -> (forall (a b c: Prop), (a -> (b \/ c)) -> ((a -> b) \/ c)).
+Proof.
+  intros. 
+  eapply H. eauto.
+Qed.
 
-  Lemma cdm_imp_EM :
-    constant_domain_meta -> forall (A:Prop), (A->False) \/ A.
-  Proof.
-    intros. eapply cdm_distr_impl_or; eauto.
-  Qed.
+Lemma cdm_imp_EM :
+  constant_domain_meta -> forall (A:Prop), (A->False) \/ A.
+Proof.
+  intros. eapply cdm_distr_impl_or; eauto.
+Qed.
 
-  Lemma EM_imp_cdm : 
-    (forall (A:Prop), (A->False) \/ A) -> constant_domain_meta.
-  Proof.
-    unfold constant_domain_meta; intros.
-    specialize (H B); destruct H.
-    + left. intros. specialize (H0 x).
-      destruct H0.
-      ++  eapply H0. 
-      ++  eapply H in H0. eauto.
-    + right. eapply H.
-  Qed. 
+Lemma EM_imp_cdm : 
+  (forall (A:Prop), (A->False) \/ A) -> constant_domain_meta.
+Proof.
+  unfold constant_domain_meta; intros.
+  specialize (H B); destruct H.
+  + left. intros. specialize (H0 x).
+    destruct H0.
+    ++  eapply H0. 
+    ++  eapply H in H0. eauto.
+  + right. eapply H.
+Qed. 
 
 Lemma CD_forall (fr : kframe)(M: kmodel)(u : nodes) (rho: nat -> domain) (phi: form): 
   constant_domain M -> good u rho -> (ksat u rho (quant All phi) <-> forall (j: domain), (exists (v: nodes), world v j) -> (j .: rho) ⊩( u, M) phi).
@@ -537,7 +537,7 @@ Proof.
   all: eauto using good_mon; eapply H; eauto. 
   * eapply H5; intros.
   pose proof (H x v x0). eapply H7 in H6.
-  specialize (H3 v (reach_refl v) x0 H6); destruct H3.
+  specialize (H3 v (reach_refl v) x0 H6). destruct H3.
   left; eapply ksat_mon; eauto using H3, good_mon, good_shift.
   right; apply H3. 
 Qed.
@@ -546,268 +546,256 @@ End ConstantDomain.
 
 Section Example_nonConstantDomain.
 
-    Instance Σ_funcs : funcs_signature :=
-      {|
-        syms := Empty_set;
-        ar_syms := fun _ => 0;
-      |}.
+Instance Σ_funcs : funcs_signature :=
+  {|
+    syms := Empty_set;
+    ar_syms := fun _ => 0;
+  |}.
 
-    Inductive Preds : Type:=
-    | Pp : Preds
-    | Q : Preds.
+Inductive Preds : Type:=
+  | Pp : Preds
+  | Qq : Preds.
 
-    Instance Σ_preds : preds_signature :=
-      {|
-        preds := Preds;
-        ar_preds := fun x => 1;
-      |}.
+Instance Σ_preds : preds_signature :=
+  {|
+    preds := Preds;
+    ar_preds := fun x => 1;
+  |}.
+
+Instance ff : falsity_flag := falsity_on.
+
+Inductive my_domain : Type :=
+  | a : my_domain
+  | b : my_domain.
+
+Inductive my_nodes : Type :=
+  | u : my_nodes
+  | v : my_nodes.
+
+Definition my_reach x y: Prop :=
+  match x with 
+  | u => True
+  | v => match y with
+        | v => True
+        | _ => False
+        end
+  end.
+
+Definition my_world node t: Prop :=
+  match node with 
+  | u => match t with 
+        | a => True
+        | b => False
+        end
+  | v => True
+end.
+
+Program Instance my_frm : kframe :=
+  {|
+    domain := my_domain;
+    nodes := my_nodes;
+    reachable := my_reach;
+    world := my_world;
+  |}.
+Next Obligation.
+  induction u0; simpl; tauto.
+Defined.
+Next Obligation.
+  induction u0; induction v0; induction w; eauto.
+Defined.
+Next Obligation.
+  induction u0; induction v0; induction x; eauto.
+Defined.
+
+Instance my_I_u : @interp Σ_funcs Σ_preds my_domain :=
+{| 
+  i_func := fun _ _ => a; 
+  i_atom := fun pr x => match x with
+                        | cons _ a _ (nil _) => match pr with 
+                                                | Pp => False
+                                                | Qq => True
+                                                end
+                        | cons _ b _ (nil _) =>  False
+                        | _ => False
+                        end;
+|}.
+
+Instance my_I_v : @interp Σ_funcs Σ_preds my_domain :=
+{| 
+  i_func := fun _ _ => a; 
+  i_atom := fun pr x => match x with
+                        | cons _ a _ (nil _) => match pr with 
+                                                | Pp => False
+                                                | Qq => True
+                                                end
+                        | cons _ b _ (nil _) =>  match pr with 
+                                                | Pp => True
+                                                | Qq => False
+                                                end
+                        | _ => False
+                        end;
+|}.
+
+Lemma in_u:
+  forall x : my_domain, my_world u x -> x = a.
+Proof.
+  intros; unfold my_world in H. 
+  induction x. reflexivity. eauto.
+Qed.
+
+Lemma in_v:
+  forall x : my_domain, my_world v x -> x = a \/ x = b.
+Proof.
+  intros. unfold my_world in H.
+  induction x; eauto. 
+Qed.
+
+Lemma In_inv {A: Type}{n: nat} {x: A} {vv : t A n} :
+  In x vv -> (match n return t A n -> Prop with
+              | 0 => fun _ => False
+              | S n => fun vv' => (x = Vector.hd vv') \/ (In x (Vector.tl vv'))
+              end) vv.
+Proof. 
+  intros []; cbn; tauto.
+Qed.
+
+Lemma tail_vec_1 {A: Type} :
+forall vv: (t A 1), tl vv = nil A.
+Proof.
+  intros; dependent destruction vv; cbn; 
+  dependent destruction vv; reflexivity.
+Qed.
+
+Lemma vec_in_u':
+  forall vv: (t my_domain 1), forall x : domain, In x vv -> my_world u x -> hd vv = a.
+Proof.
+  intros. 
+  erewrite  <- in_u.
+  2: apply H0. eapply In_inv in H. simpl in H. 
+  destruct H. rewrite H; eauto; tauto.
+  apply In_inv in H; simpl in H; auto.
+Qed.
+
+Lemma vec_in_u:
+  forall vv: (t my_domain 1), forall x : domain, In x vv -> my_world u x -> vv = cons my_domain a 0 (nil my_domain).
+Proof.
+  intros.
+  eapply vec_in_u' in H; eauto.
+  pose proof eta vv.
+  rewrite H1. cbn. f_equal. eapply H.
+  eapply tail_vec_1.
+Qed.
+
+Lemma vec_in_v':
+forall vv: (t my_domain 1), forall x : domain, In x vv -> my_world v x ->  
+hd vv = a \/ hd vv = b.
+Proof.
+  intros. 
+  pose proof (in_v H0). 
+  eapply In_inv in H; simpl in H; destruct H;
+  destruct H1; rewrite <- H1; eauto. 
+  all: rewrite tail_vec_1 in H; eapply In_inv in H; simpl in H; eauto.
+Qed.
+
+Lemma vec_in_v:
+forall vv: (t my_domain 1), forall x : domain, In x vv -> my_world v x ->  
+vv = cons my_domain a 0 (nil my_domain) \/ vv = cons my_domain b 0 (nil my_domain).
+Proof.
+  intros.
+  eapply vec_in_v' in H; eauto.
+  pose proof eta vv.
+  rewrite H1. destruct H. 
+  left; f_equal. eapply H. eapply tail_vec_1.
+  right; f_equal. eapply H. eapply tail_vec_1.
+Qed.
+
+#[refine] Instance my_kmodel: @kmodel _ _ my_frm :=
+{|
+    I := fun (w: nodes) => match w with 
+                          | u => my_I_u
+                          | v => my_I_v
+                          end;
+|}.
+Proof.
+  - unfold in_dom; intros; induction u0; simpl in *; eauto.
+    destruct x; eauto.
+    dependent destruction vv; induction h; destruct vv; destruct P; eauto.
+    apply In_inv in H0; simpl in H0; destruct H0.
+    discriminate H0.
+    apply In_inv in H0; simpl in H0; eauto.
+  - intros.
+    remember P as PP.
+    induction PP; induction u0; induction v0; cbn; eauto; unfold in_dom in a0.
+    all : dependent destruction vv; destruct h.
+    dependent destruction vv.
+    simpl in H; eauto.
+    all : dependent destruction vv. eauto.
+    all: simpl in H; eauto. 
+  - induction u0; simpl; auto.
+  - induction u0; induction v0; simpl; reflexivity.  
+Defined.
+
+Definition A (alpha: t term 1): form :=  atom Q alpha.
+Definition B (alpha: t term 1): form := quant Ex (atom Pp alpha).
+
+Definition constant_domain_axiom (alpha : t term 1):  form :=
+  bin Impl (quant All (bin Disj (A alpha) (B alpha))) (bin Disj (quant All (A alpha)) (B alpha)).
     
-    Instance ff : falsity_flag := falsity_on.
+Definition my_rho : nat -> my_domain :=
+  fun _ => a.
 
-    Inductive my_domain : Type :=
-      | a : my_domain
-      | b : my_domain.
+Lemma good_my_rho: 
+  good u my_rho.
+Proof.
+  unfold good. intros. unfold my_rho. now simpl.
+Qed.
 
-    Inductive my_nodes : Type :=
-      | u : my_nodes
-      | v : my_nodes.
+Definition aa := cons term (var 0) 0 (nil term).
 
-    Definition my_reach x y: Prop :=
-      match x with 
-      | u => True
-      | v => match y with
-            | v => True
-            | _ => False
-            end
-      end.
+Lemma prop1 (rho: nat -> my_domain)(w : my_nodes):
+  good w rho ->
+  @ksat _ _ _ my_kmodel _ w rho (quant All (bin Disj (A aa) (B aa))).
+Proof.
+  simpl. intros.
+  induction v0.
+  + left. 
+    eapply in_u in H1. rewrite H1.
+    unfold i_atom; unfold my_I_u; eauto.
+  + right; exists b; split. eauto. eauto.
+Qed.
 
-    Definition my_world node t: Prop :=
-      match node with 
-      | u => match t with 
-            | a => True
-            | b => False
-            end
-      | v => True
-    end.
+Lemma prop2 (rho: nat -> my_domain):
+good u rho ->
+  @ksat _ _ _ my_kmodel _ u rho (bin Disj (quant All (A aa)) (B aa)) -> False.
+Proof.
+  intros. simpl in H0. destruct H0.
+  + specialize (H0 v); assert True; eauto. specialize (H0 H1 b).
+    simpl in H0. now eapply H0.
+  + unfold good in H. specialize (H 0). destruct H0 as (j, (H1, H2)). 
+    destruct j in H1, H2; eauto.
+Qed.
 
-    Program Instance my_frm : kframe :=
-      {|
-        domain := my_domain;
-        nodes := my_nodes;
-        reachable := my_reach;
-        world := my_world;
-      |}.
-    Next Obligation.
-      induction u0; simpl; tauto.
-    Qed.
-    Next Obligation.
-      induction u0; induction v0; induction w; eauto.
-    Qed.
-    Next Obligation.
-      induction u0; induction v0; induction x; eauto.
-    Qed.
+Lemma not_CDA : 
+  @ksat _ _ _ my_kmodel _ u my_rho (constant_domain_axiom aa) -> False.
+Proof.
+  intros. eapply prop2. 2: eapply H. 3: eapply prop1.
+  all: eauto using reach_refl, good_my_rho. 
+Qed.
 
-    Print interp.
+Definition anti_constant_domain_axiom (alpha : t term 1):  form :=
+  bin Impl (bin Disj (quant All (A alpha)) (B alpha)) (quant All (bin Disj (A alpha) (B alpha))). 
 
-    Instance my_I_u : @interp Σ_funcs Σ_preds my_domain :=
-      {| 
-        i_func := fun _ _ => a; 
-        i_atom := fun pr x => match x with
-                              | cons _ a _ (nil _) => match pr with 
-                                                      | Pp => False
-                                                      | Q => True
-                                                      end
-                              | cons _ b _ (nil _) =>  False
-                              | _ => False
-                              end;
-      |}.
-
-      Instance my_I_v : @interp Σ_funcs Σ_preds my_domain :=
-      {| 
-        i_func := fun _ _ => a; 
-        i_atom := fun pr x => match x with
-                              | cons _ a _ (nil _) => match pr with 
-                                                      | Pp => False
-                                                      | Q => True
-                                                      end
-                              | cons _ b _ (nil _) =>  match pr with 
-                                                      | Pp => True
-                                                      | Q => False
-                                                      end
-                              | _ => False
-                              end;
-      |}.
-
-    Lemma in_u:
-    forall x : my_domain, my_world u x -> x = a.
-    Proof.
-      intros. 
-      unfold my_world in H.
-      induction x.
-      reflexivity.
-      eauto.
-    Qed.
-
-    Lemma in_v:
-    forall x : my_domain, my_world v x -> x = a \/ x = b.
-    Proof.
-      intros. 
-      unfold my_world in H.
-      induction x.
-      left; reflexivity.
-      eauto.
-    Qed.
-
-    Lemma In_inv {A: Type}{n: nat} {x: A} {v : t A n} :
-        In x v ->
-        (match n return t A n -> Prop with
-        | 0 => fun _ => False
-        | S n => fun v' => (x = Vector.hd v') \/ (In x (Vector.tl v'))
-        end) v.
-    Proof. 
-    intros []; cbn; tauto.
-    Qed.
-
-    Lemma tail_vec_1 {A: Type} :
-    forall vv: (t A 1), tl vv = nil A.
-    Proof.
-      intros. 
-      dependent destruction vv. cbn. 
-      dependent destruction vv. reflexivity.
-    Qed.
-
-    Lemma vec_in_u':
-    forall vv: (t my_domain 1), forall x : domain, In x vv -> my_world u x ->  
-    hd vv = a.
-    Proof.
-      intros. 
-      erewrite  <- in_u.
-      2: apply H0. eapply In_inv in H. simpl in H. 
-      destruct H. rewrite H; eauto; tauto.
-      apply In_inv in H; simpl in H; auto.
-    Qed.
-
-    Lemma vec_in_u:
-    forall vv: (t my_domain 1), forall x : domain, In x vv -> my_world u x ->  
-    vv = cons my_domain a 0 (nil my_domain).
-    Proof.
-      intros.
-      eapply vec_in_u' in H; eauto.
-      pose proof eta vv.
-      rewrite H1. cbn. f_equal. eapply H.
-      eapply tail_vec_1.
-    Qed.
-
-    Lemma vec_in_v':
-    forall vv: (t my_domain 1), forall x : domain, In x vv -> my_world v x ->  
-    hd vv = a \/ hd vv = b.
-    Proof.
-      intros. 
-      pose proof (in_v H0). 
-      eapply In_inv in H; simpl in H; destruct H;
-      destruct H1; rewrite <- H1; eauto. 
-      all: rewrite tail_vec_1 in H; eapply In_inv in H; simpl in H; eauto.
-    Qed.
-
-    Lemma vec_in_v:
-    forall vv: (t my_domain 1), forall x : domain, In x vv -> my_world v x ->  
-    vv = cons my_domain a 0 (nil my_domain) \/ vv = cons my_domain b 0 (nil my_domain).
-    Proof.
-      intros.
-      eapply vec_in_v' in H; eauto.
-      pose proof eta vv.
-      rewrite H1. destruct H. 
-      left; f_equal. eapply H. eapply tail_vec_1.
-      right; f_equal. eapply H. eapply tail_vec_1.
-    Qed.
-
-    #[refine] Instance my_kmodel: @kmodel _ _ my_frm :=
-    {|
-        I := fun (w: nodes) => match w with 
-                              | u => my_I_u
-                              | v => my_I_v
-                              end;
-    |}.
-    Proof.
-      - unfold in_dom; intros; induction u0; simpl in *; eauto.
-        destruct x; eauto.
-        dependent destruction vv; induction h; destruct vv; destruct P; eauto.
-        apply In_inv in H0; simpl in H0; destruct H0.
-        discriminate H0.
-        apply In_inv in H0; simpl in H0; eauto.
-      - intros.
-        remember P as PP.
-        induction PP; induction u0; induction v0; cbn; eauto; unfold in_dom in a0.
-        all : dependent destruction vv; destruct h.
-        dependent destruction vv.
-        simpl in H; eauto.
-        all : dependent destruction vv. eauto.
-        all: simpl in H; eauto. 
-      - induction u0; simpl; auto.
-      - induction u0; induction v0; simpl; reflexivity.  
-    Defined.
-
-  Definition A (alpha: t term 1): form :=  atom Q alpha.
-  Definition B (alpha: t term 1): form := quant Ex (atom Pp alpha).
-
-  Definition constant_domain_axiom (alpha : t term 1):  form :=
-    bin Impl (quant All (bin Disj (A alpha) (B alpha))) (bin Disj (quant All (A alpha)) (B alpha)).
-    
-  Definition my_rho : nat -> my_domain :=
-    fun _ => a.
-
-  Lemma good_my_rho: 
-    good u my_rho.
-  Proof.
-    unfold good. intros. unfold my_rho. now simpl.
-  Qed.
-
-  Definition aa := cons term (var 0) 0 (nil term).
-
-  Lemma prop1 (rho: nat -> my_domain)(w : my_nodes):
-    good w rho ->
-    @ksat _ _ _ my_kmodel _ w rho (quant All (bin Disj (A aa) (B aa))).
-  Proof.
-    simpl. intros.
-    induction v0.
-    + left. 
-      eapply in_u in H1. rewrite H1.
-      unfold i_atom; unfold my_I_u; eauto.
-    + right; exists b; split. eauto. eauto.
-  Qed.
-
-  Lemma prop2 (rho: nat -> my_domain):
-  good u rho ->
-    @ksat _ _ _ my_kmodel _ u rho (bin Disj (quant All (A aa)) (B aa)) -> False.
-  Proof.
-    intros. simpl in H0. destruct H0.
-    + specialize (H0 v); assert True; eauto. specialize (H0 H1 b).
-      simpl in H0. now eapply H0.
-    + unfold good in H. specialize (H 0). destruct H0 as (j, (H1, H2)). 
-      destruct j in H1, H2; eauto.
-  Qed.
-
-  Lemma not_CDA : 
-    @ksat _ _ _ my_kmodel _ u my_rho (constant_domain_axiom aa) -> False.
-  Proof.
-    intros. eapply prop2. 2: eapply H. 3: eapply prop1.
-    all: eauto using reach_refl, good_my_rho. 
-  Qed.
-
-  Definition anti_constant_domain_axiom (alpha : t term 1):  form :=
-    bin Impl (bin Disj (quant All (A alpha)) (B alpha)) (quant All (bin Disj (A alpha) (B alpha))). 
-
-  Lemma CDA (fr : kframe)(M: kmodel)(u: nodes)(rho: nat -> domain): 
-    ksat u rho (anti_constant_domain_axiom aa).
-  Proof.
-    simpl. intros.
-    destruct H0.
-    + left. now eapply H0.
-    + right. repeat destruct H0. exists x. split. eapply monotone; eauto using H0, H1.
-      eapply mon_P; eauto using H1. unfold in_dom. intros.
-      eapply In_inv in H4; simpl in H4. destruct H4. rewrite H4; eauto.
-      eapply In_inv in H4; simpl in H4; eauto.
-  Qed.
+Lemma CDA (fr : kframe)(M: kmodel)(u: nodes)(rho: nat -> domain): 
+  ksat u rho (anti_constant_domain_axiom aa).
+Proof.
+  simpl. intros.
+  destruct H0.
+  + left. now eapply H0.
+  + right. repeat destruct H0. exists x. split. eapply monotone; eauto using H0, H1.
+    eapply mon_P; eauto using H1. unfold in_dom. intros.
+    eapply In_inv in H4; simpl in H4. destruct H4. rewrite H4; eauto.
+    eapply In_inv in H4; simpl in H4; eauto.
+Qed.
 
 End Example_nonConstantDomain.
 
