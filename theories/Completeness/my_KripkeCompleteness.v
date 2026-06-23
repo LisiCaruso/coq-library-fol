@@ -1372,7 +1372,7 @@ Proof.
   eauto.   
 Qed.
  
-Definition consistent {sigma:  funcs_signature} (A: theory sigma):= (A ⊢ ⊥) -> False.  
+Definition consistent {sigma: funcs_signature} (A: theory sigma):= (A ⊢ ⊥) -> False.  
 
 Lemma consistent_imp_not_Gamma_bot{sigma:  funcs_signature}: 
   forall (T: theory sigma),
@@ -1402,7 +1402,6 @@ Definition th_incl {sigma: funcs_signature}(T1 T2: theory sigma) :=
   forall phi: form sigma, T1 phi -> T2 phi. 
 
 Notation "A ⊑ B" := (th_incl A B) (at level 20).  
-
 
 #[local] Hint Unfold consistent th_incl : core.
 *)
@@ -1438,7 +1437,6 @@ Hypothesis c_bound_ex:  forall N n,
                               c_bounded N (enum_ex (N) n).
 
 Hypothesis H_enum_ex : forall phi, forall N n, c_bounded N phi -> exists m, m>=n /\ enum_ex N m = (phi).
-
 
 Definition Even n := exists m, n = 2*m.
 Definition Odd n := exists m, n = 2*m+1.
@@ -1797,7 +1795,7 @@ eauto.
 Qed.
 
 Existing Instance Σf.
-Context {HF : eq_dec Σf} {XHF : eq_dec C_Σf} {HP : eq_dec preds}.
+Context {XHF : eq_dec C_Σf} {HP : eq_dec preds}.
 
 Program Instance canonical_model_frm : kframe :=
     {|
@@ -1851,7 +1849,7 @@ Proof.
     Unshelve. 2: eapply n_saturated_nodes.
     eapply c_bound_p_term in H.
     eapply Forall_forall; eauto. 
-    + intros. unfold i_atom in *; simpl in *.
+  + intros. unfold i_atom in *; simpl in *.
     unfold c_incl in reach. eapply Weak; eauto.
     eapply reach.
   + intros. unfold in_dom in *.
@@ -1883,7 +1881,7 @@ Proof.
 Qed.
 
 Print "⋄".
-Lemma Impl_inv {sigma_f: funcs_signature}{HS: eq_dec sigma_f} 
+Lemma Impl_inv {sigma_f: funcs_signature}{HSF: eq_dec sigma_f}{HSP: eq_dec  Σp}
   (T : theory sigma_f)(phi psi: form sigma_f ):
   (T ⊢ phi → psi) <-> (T⋄phi  ⊢ psi ).
 Proof.
@@ -1896,7 +1894,7 @@ Proof.
     * eapply Impl_inv'; eauto. 
   + eapply prv_T_impl. 
     eapply H.
-Qed.
+Qed. 
 
 Lemma asimpl_test_1 {sigma: funcs_signature} phi t rho :
     phi[up rho][t..] = phi[t.:rho].
