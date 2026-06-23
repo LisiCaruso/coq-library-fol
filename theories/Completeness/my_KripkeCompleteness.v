@@ -735,7 +735,7 @@ Proof.
   - induction u0; induction v0; simpl; reflexivity.  
 Defined.
 
-Definition A (alpha: t term 1): form :=  atom Q alpha.
+Definition A (alpha: t term 1): form :=  atom Qq alpha.
 Definition B (alpha: t term 1): form := quant Ex (atom Pp alpha).
 
 Definition constant_domain_axiom (alpha : t term 1):  form :=
@@ -798,7 +798,6 @@ Proof.
 Qed.
 
 End Example_nonConstantDomain.
-
 
 Section Completeness.
 
@@ -1592,51 +1591,27 @@ Qed.
 
 Arguments form _ {_ _ _}.
 
+Lemma prv_ext_list (A: list (form Σf))(phi: form Σf):
+  A ⊢I phi <-> List.map form_to_C_Σf_form A  ⊢I form_to_C_Σf_form phi.
+Proof.
+  split; intros.
+  + admit.
+  + admit.
+Admitted.
+
 Lemma prv_ext (T: theory Σf)(A: form Σf):
     T ⊢ A <-> theory_to_C_Σf_theory T  ⊢ form_to_C_Σf_form A.
 Proof.
-  split.
-  2: admit.
-  unfold "⊢".  
-  intros. destruct H as (G, (H1, H)). 
-  exists (List.map form_to_C_Σf_form G). split.
-  intros.
-  unfold theory_to_C_Σf_theory.
-  eapply in_map_iff in H0.
-  destruct H0 as (phi', (HH, HT)).
-  exists phi'. split; eauto.
-  remember intu as temp.
+  split; intros; destruct H as (Delta, (Delta_incl, H)).
+  + exists (List.map form_to_C_Σf_form Delta).
+    split; intros.
+    * unfold theory_to_C_Σf_theory. intros.
+      eapply in_map_iff in H0.
+      destruct H0 as (phi', (HH, HT)).
+      exists phi'. split; eauto.
+    * eapply prv_ext_list; eauto.
+  + admit.
 Admitted.
-  (*
-  unfold "⊢".  
-  intros; destruct H as (G, (H1, H)). 
-  exists (List.map form_to_C_Σf_form G). split.
-  + intros.
-    unfold theory_to_C_Σf_theory.
-    exists (C_form_to_Σf_form psi).
-    eapply sanity_translation1.
-  + (*rewrite <- List.Forall_map.*)
-
-    (*eapply prv_ind_intu_on with (P:= fun G A => [form_to_C_Σf_form p | p ∈ G] ⊢I form_to_C_Σf_form A)*)
-    (* THIS DOES NOT WORK!!!! *)
-    remember intu as temp.
-       eapply prv_ind_intu_on; eauto; intros; trivial. 
-      - eapply II; eauto.
-      - eapply IE; eauto.
-      - eapply AllI; eauto.
-      - eapply AllE; eauto.
-      - eapply ExI; eauto.
-      - eapply ExE; eauto.
-      - eapply Exp; eauto.
-      - eapply Ctx; eauto.
-      - eapply CI; eauto.
-      - eapply CE1; eauto.
-      - eapply CE2; eauto.
-      - eapply DI1; eauto.
-      - eapply DI2; eauto.
-      - eapply DE; eauto.
-      - admit.
-    *)
 
 Lemma n_saturated_c_bound (G_0: theory C_Σf)(A: form C_Σf)(N : nat)(phi : form C_Σf):
   th_c_bounded N G_0 -> c_bounded N A ->  (G_0 ⊢ A -> False) ->
@@ -1908,7 +1883,8 @@ Proof.
 Qed.
 
 Print "⋄".
-Lemma Impl_inv {sigma: funcs_signature}{HS: eq_dec sigma} T phi psi:
+Lemma Impl_inv {sigma_f: funcs_signature}{HS: eq_dec sigma_f} 
+  (T : theory sigma_f)(phi psi: form sigma_f ):
   (T ⊢ phi → psi) <-> (T⋄phi  ⊢ psi ).
 Proof.
   split; intros.
@@ -1918,7 +1894,7 @@ Proof.
     * rewrite <- H0. right. reflexivity. 
     * left. eapply HA; eauto.
     * eapply Impl_inv'; eauto. 
-  + eapply prv_T_impl.
+  + eapply prv_T_impl. 
     eapply H.
 Qed.
 
@@ -1927,6 +1903,29 @@ Lemma asimpl_test_1 {sigma: funcs_signature} phi t rho :
 Proof. 
   asimpl. reflexivity.
 Qed.
+
+Lemma All_inv' {sigma: funcs_signature}{HS: eq_dec sigma} T phi N:
+  th_c_bounded N T -> c_bounded N phi ->
+  ((T ⊢ ∀ phi) <-> (T  ⊢ phi[(@func C_Σf (inr (N, 0)) (nil term))..] )). 
+Proof.
+  intros. split; intros;destruct H1 as (A, (HA, HH)).
+  + exists A; split; eauto. eapply AllE; eauto.
+  + exists ([p [(funcomp var pred)] | p ∈ A]). split; eauto.
+    admit.
+    eapply AllI. erewrite List.map_map. cbn.
+    pose proof (@asimpl_f_comp). unfold "↑".
+    unfold ">>".
+    erewrite @List.map_ext. 2: intros; eapply H1.
+    cbn. unfold ">>". asimpl.
+    pose proof (@subst_Weak C_Σf _ A (phi)).
+    admit.
+    (*
+    prv_all. induction HH using prv_ind_full.
+    * cbn in *. cbn in HH.  eapply subst_Weak.
+    
+    
+    eapply Exp. eauto.  admit. *)
+Admitted.
 
 Lemma All_inv {sigma: funcs_signature}{HS: eq_dec sigma} T phi N rho:
   th_c_bounded N T -> c_bounded N phi ->
@@ -1945,7 +1944,7 @@ Proof.
     
     
     eapply Exp. eauto.  admit. *)
-Admitted.  
+Admitted.   
 
 Axiom DNE : forall P:Prop, ((P -> False)-> False) -> P.  
 
@@ -1972,7 +1971,7 @@ Proof.
   eapply c_bound; eauto.
   Unshelve. eapply G_n.
 Qed.
-
+(*
 Lemma th_c_bound_aux_delta (G_n: canonical_nodes)(Delta : theory C_Σf) (Delta_inc : c_set G_n ⊑ Delta)(Delta_sat : n_saturated (S (c_nat G_n)) Delta) (H: Delta = c_set (Build_canonical_nodes Delta_sat)): 
 th_c_bounded (S(S((c_nat G_n)))) (c_set (Build_canonical_nodes Delta_sat)).
 Proof.
@@ -1980,6 +1979,7 @@ Proof.
   unfold th_c_bounded; intros.
   eapply c_bound0; eauto.
 Qed.
+*)
 
 Lemma c_bound_subst_aux (G_n: canonical_nodes)(phi : form Σf)(rho : nat -> @term C_Σf):
   (forall n : nat, term_c_bounded (S (c_nat G_n)) (rho n)) ->
@@ -1989,6 +1989,7 @@ Proof.
   eapply form_to_C_Σf_form_bounded.
 Qed.
 
+(*
 Lemma c_bound_all_aux (G_n: canonical_nodes)(phi : form Σf)(rho : nat -> @term C_Σf):
  (forall n : nat, term_c_bounded (S (c_nat G_n)) (rho n)) ->
     (c_bounded (S (c_nat G_n)) (∀ (form_to_C_Σf_form phi)) [rho]).
@@ -1996,6 +1997,7 @@ Proof.
   intros; eapply c_bound_eval; eauto.
   eapply bounded_quant; eapply form_to_C_Σf_form_bounded.
 Qed.
+*)
 
 Lemma c_incl_aux (G_n: canonical_nodes)(Delta : theory C_Σf)(Delta_sat : n_saturated (S (c_nat G_n)) Delta)(rho : nat -> @term C_Σf)phi (Delta_inc : (c_set G_n ⋄ phi) ⊑ Delta):
   c_incl G_n (Build_canonical_nodes Delta_sat).
@@ -2013,6 +2015,7 @@ Proof.
   eapply le_n_S; eauto.
 Qed.  
 
+(*
 Lemma eval_c_bound_up N rho: 
   (forall n : nat, term_c_bounded (N) (rho n)) ->
   forall n : nat, term_c_bounded (N) ((up rho) n).
@@ -2031,8 +2034,9 @@ Proof.
   eapply eval_c_bound_up. intros. eapply term_c_bound_mon. 2: eapply H. eauto.
   eapply form_to_C_Σf_form_bounded.
 Qed.
+*)
 
-Lemma truth_lemma_rho:
+Lemma truth_lemma_rho: (*shoul try doing this with good G_n rho al posto dell'altra ipotesi*)
   forall (G_n : nodes)(phi: form Σf)(rho : nat -> @term C_Σf), 
   (forall n: nat, term_c_bounded (S(c_nat G_n)) (rho n)) ->
   ((c_set G_n) ((form_to_C_Σf_form phi)[rho])) <->
@@ -2083,8 +2087,7 @@ Proof.
       destruct H1 as (Delta, (Delta_sub, HH)); exists Delta.
       split. intros; eapply G_incl; eapply Delta_sub; eauto.
       eapply (@AllE _ _ _ _ _ j) in HH. asimpl in HH; eauto.
-    * 
-      assert(th_c_bounded  (S(c_nat G_n)) (c_set G_n)).
+    * assert(th_c_bounded  (S(c_nat G_n)) (c_set G_n)).
       unfold th_c_bounded; intros; eapply c_bound; eauto.
       eapply DNE; intros. cbn in H3.
       erewrite All_inv in H3.
@@ -2130,7 +2133,7 @@ Proof.
       destruct HH as (Delta, (Delta_sub, HH)).
       exists Delta; split; eauto.
       cbn.
-      eapply ExI.
+      eapply ExI.  
       asimpl; eauto.
       intros n. induction n; cbn; eauto.
 Qed.
@@ -2149,18 +2152,16 @@ Proof.
   destruct H1 as (Delta, (Hinc, (Hsat, H1))).
   eapply H1.
   eapply (iff_der_closed (Build_canonical_nodes Hsat) (form_to_C_Σf_form phi)); simpl.
-  pose proof (truth_lemma_rho).
-  specialize (H2 (Build_canonical_nodes Hsat) (phi) (fun x => var x)); simpl in H2.
-  rewrite <- subst_var.
+  pose proof (@truth_lemma_rho (Build_canonical_nodes Hsat) (phi) (fun x => var x)); simpl in H2.
+  rewrite subst_var in H2.
   eapply H2. 
-  intros. eapply bounded_var.
+  intros; eapply bounded_var.
   eapply H.
   eapply good_var.
   intros.
   eapply truth_lemma_rho.
-  intros. eapply bounded_var.
-  eapply iff_der_closed.
-  cbn. rewrite subst_var.
+  intros; eapply bounded_var.
+  eapply iff_der_closed; cbn; rewrite subst_var.
   unfold  "⊢".
   exists [form_to_C_Σf_form psi]; split.
   intros. simpl in H4; destruct H4.
